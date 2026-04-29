@@ -10,6 +10,9 @@ import (
 	"strings"
 )
 
+// DefaultAPIBaseURL is the production evaluation API origin (no trailing slash).
+const DefaultAPIBaseURL = "https://api.redpennon.dev"
+
 // UserContext maps to the evaluation API "user" object.
 type UserContext struct {
 	ID               string   `json:"id,omitempty"`
@@ -61,8 +64,12 @@ type Client struct {
 	httpClient *http.Client
 }
 
-// NewClient returns a client for baseURL (e.g. https://api.redpennon.dev) and X-Api-Key.
-func NewClient(baseURL, apiKey string) *Client {
+// NewClient returns a client that calls [DefaultAPIBaseURL] with the given X-Api-Key.
+func NewClient(apiKey string) *Client {
+	return newClient(DefaultAPIBaseURL, apiKey)
+}
+
+func newClient(baseURL, apiKey string) *Client {
 	b := strings.TrimRight(baseURL, "/")
 	return &Client{
 		baseURL:    b,

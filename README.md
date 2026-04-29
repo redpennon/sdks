@@ -14,6 +14,6 @@ Thin HTTP clients for the [evaluation API](https://docs.redpennon.dev) (`POST /v
 - **Go** (requires Go 1.22+): `cd go && go test ./...`
 - **Python** (requires Python 3.12+): `cd python && python -m venv .venv && source .venv/bin/activate && pip install -e '.[dev]' && pytest`
 
-Default API base URL in examples: `https://api.redpennon.dev`. For local API: `http://localhost:8001`.
+All SDKs call production `https://api.redpennon.dev` only. Pass a custom `httpx.Client` (e.g. with `MockTransport`) in tests, or `fetchImpl` in Node.
 
 Authentication: `X-Api-Key` with the environment API key (UUID).

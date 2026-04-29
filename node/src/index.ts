@@ -1,3 +1,5 @@
+export const DEFAULT_API_BASE_URL = "https://api.redpennon.dev";
+
 export type UserContext = {
   id?: string;
   email?: string;
@@ -40,18 +42,17 @@ export class APIError extends Error {
 }
 
 export type ClientOptions = {
-  baseUrl: string;
   apiKey: string;
   fetchImpl?: typeof fetch;
 };
 
 export class RedPennonClient {
-  private readonly baseUrl: string;
+  private readonly origin: string;
   private readonly apiKey: string;
   private readonly fetchImpl: typeof fetch;
 
   constructor(options: ClientOptions) {
-    this.baseUrl = options.baseUrl.replace(/\/+$/, "");
+    this.origin = DEFAULT_API_BASE_URL.replace(/\/+$/, "");
     this.apiKey = options.apiKey;
     this.fetchImpl = options.fetchImpl ?? globalThis.fetch;
   }
@@ -65,7 +66,7 @@ export class RedPennonClient {
   }
 
   private async postJson<T>(path: string, body: unknown): Promise<T> {
-    const url = `${this.baseUrl}${path}`;
+    const url = `${this.origin}${path}`;
     const res = await this.fetchImpl(url, {
       method: "POST",
       headers: {

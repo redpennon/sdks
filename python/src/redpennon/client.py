@@ -5,6 +5,9 @@ from typing import Any, Mapping, MutableMapping, Sequence
 
 import httpx
 
+# Production evaluation API origin (no trailing slash).
+DEFAULT_API_BASE_URL = "https://api.redpennon.dev"
+
 
 @dataclass(frozen=True, slots=True)
 class UserContext:
@@ -69,17 +72,15 @@ class APIError(Exception):
 
 
 class Client:
-    """HTTP client for the RedPennon evaluation API."""
+    """HTTP client for the RedPennon evaluation API at DEFAULT_API_BASE_URL."""
 
     def __init__(
         self,
         *,
-        base_url: str,
         api_key: str,
         timeout: float = 30.0,
         client: httpx.Client | None = None,
     ) -> None:
-        self._base_url = base_url.rstrip("/")
         self._api_key = api_key
         self._owns_client = client is None
         self._client = client or httpx.Client(timeout=timeout)
@@ -95,7 +96,7 @@ class Client:
         self.close()
 
     def _post(self, path: str, body: MutableMapping[str, Any]) -> Any:
-        url = f"{self._base_url}{path}"
+        url = f"{DEFAULT_API_BASE_URL}{path}"
         r = self._client.post(
             url,
             json=body,

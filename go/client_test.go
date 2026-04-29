@@ -31,7 +31,7 @@ func TestClient_Evaluate_success(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	c := NewClient(srv.URL, "test-key")
+	c := newClient(srv.URL, "test-key")
 	res, err := c.Evaluate(context.Background(), EvaluateRequest{Feature: "my-flag"})
 	if err != nil {
 		t.Fatal(err)
@@ -55,7 +55,7 @@ func TestClient_EvaluateBatch_success(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	c := NewClient(srv.URL, "test-key")
+	c := newClient(srv.URL, "test-key")
 	res, err := c.EvaluateBatch(context.Background(), BatchRequest{Features: []string{"a"}})
 	if err != nil {
 		t.Fatal(err)
@@ -74,7 +74,7 @@ func TestClient_Evaluate_apiError(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	c := NewClient(srv.URL, "bad")
+	c := newClient(srv.URL, "bad")
 	_, err := c.Evaluate(context.Background(), EvaluateRequest{Feature: "x"})
 	if err == nil {
 		t.Fatal("expected error")
@@ -99,7 +99,7 @@ func TestClient_Evaluate_apiError_nonJSONBody(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	c := NewClient(srv.URL, "k")
+	c := newClient(srv.URL, "k")
 	_, err := c.Evaluate(context.Background(), EvaluateRequest{Feature: "x"})
 	apiErr, ok := err.(*APIError)
 	if !ok {
@@ -118,10 +118,21 @@ func TestClient_Evaluate_decodeFailure(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	c := NewClient(srv.URL, "k")
+	c := newClient(srv.URL, "k")
 	_, err := c.Evaluate(context.Background(), EvaluateRequest{Feature: "x"})
 	if err == nil {
 		t.Fatal("expected decode error")
+	}
+}
+
+func TestNewClient_usesDefaultBaseURL(t *testing.T) {
+	t.Parallel()
+	c := NewClient("k")
+	if c.baseURL != DefaultAPIBaseURL {
+		t.Fatalf("baseURL: got %q want %q", c.baseURL, DefaultAPIBaseURL)
+	}
+	if c.apiKey != "k" {
+		t.Fatalf("apiKey: got %q", c.apiKey)
 	}
 }
 
@@ -136,7 +147,7 @@ func TestNewClient_trimsTrailingSlash(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	c := NewClient(srv.URL+"//", "k")
+	c := newClient(srv.URL+"//", "k")
 	if _, err := c.Evaluate(context.Background(), EvaluateRequest{Feature: "x"}); err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +155,7 @@ func TestNewClient_trimsTrailingSlash(t *testing.T) {
 
 func TestClient_Evaluate_networkError(t *testing.T) {
 	t.Parallel()
-	c := NewClient("http://127.0.0.1:1", "k")
+	c := newClient("http://127.0.0.1:1", "k")
 	_, err := c.Evaluate(context.Background(), EvaluateRequest{Feature: "x"})
 	if err == nil {
 		t.Fatal("expected network error")

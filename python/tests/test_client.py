@@ -16,7 +16,7 @@ def test_evaluate_success() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.method == "POST"
         assert str(request.url).startswith(DEFAULT_API_BASE_URL)
-        assert request.url.path == "/v1/evaluate/"
+        assert request.url.path == "/v1/evaluate"
         assert request.headers.get("x-api-key") == "test-key"
         assert _request_json(request) == {"feature": "my-flag"}
         return httpx.Response(
@@ -71,7 +71,7 @@ def test_evaluate_with_user_context() -> None:
 
 def test_evaluate_batch_success() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
-        assert request.url.path == "/v1/evaluate/batch/"
+        assert request.url.path == "/v1/evaluate/batch"
         return httpx.Response(
             200,
             json={

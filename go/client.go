@@ -22,13 +22,13 @@ type UserContext struct {
 	Audiences        []string `json:"audiences,omitempty"`
 }
 
-// EvaluateRequest is the body for POST /v1/evaluate/.
+// EvaluateRequest is the body for POST /v1/evaluate.
 type EvaluateRequest struct {
 	Feature string       `json:"feature"`
 	User    *UserContext `json:"user,omitempty"`
 }
 
-// EvaluateResponse is a successful 200 from POST /v1/evaluate/.
+// EvaluateResponse is a successful 200 from POST /v1/evaluate.
 type EvaluateResponse struct {
 	Feature    string         `json:"feature"`
 	Variation  string         `json:"variation"`
@@ -36,13 +36,13 @@ type EvaluateResponse struct {
 	Reason     string         `json:"reason"`
 }
 
-// BatchRequest is the body for POST /v1/evaluate/batch/.
+// BatchRequest is the body for POST /v1/evaluate/batch.
 type BatchRequest struct {
 	Features []string     `json:"features"`
 	User     *UserContext `json:"user,omitempty"`
 }
 
-// BatchResponse is a successful 200 from POST /v1/evaluate/batch/.
+// BatchResponse is a successful 200 from POST /v1/evaluate/batch.
 type BatchResponse struct {
 	Results map[string]EvaluateResponse `json:"results"`
 }
@@ -115,19 +115,19 @@ func (c *Client) postJSON(ctx context.Context, path string, body any, out any) e
 	return nil
 }
 
-// Evaluate calls POST /v1/evaluate/.
+// Evaluate calls POST /v1/evaluate.
 func (c *Client) Evaluate(ctx context.Context, req EvaluateRequest) (*EvaluateResponse, error) {
 	var out EvaluateResponse
-	if err := c.postJSON(ctx, "/v1/evaluate/", req, &out); err != nil {
+	if err := c.postJSON(ctx, "/v1/evaluate", req, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
 }
 
-// EvaluateBatch calls POST /v1/evaluate/batch/.
+// EvaluateBatch calls POST /v1/evaluate/batch.
 func (c *Client) EvaluateBatch(ctx context.Context, req BatchRequest) (*BatchResponse, error) {
 	var out BatchResponse
-	if err := c.postJSON(ctx, "/v1/evaluate/batch/", req, &out); err != nil {
+	if err := c.postJSON(ctx, "/v1/evaluate/batch", req, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil

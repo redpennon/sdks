@@ -12,7 +12,7 @@ import (
 func TestClient_Evaluate_success(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost || r.URL.Path != "/v1/evaluate/" {
+		if r.Method != http.MethodPost || r.URL.Path != "/v1/evaluate" {
 			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
 		}
 		if r.Header.Get("X-Api-Key") != "test-key" {
@@ -47,7 +47,7 @@ func TestClient_Evaluate_success(t *testing.T) {
 func TestClient_EvaluateBatch_success(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost || r.URL.Path != "/v1/evaluate/batch/" {
+		if r.Method != http.MethodPost || r.URL.Path != "/v1/evaluate/batch" {
 			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -139,7 +139,7 @@ func TestNewClient_usesDefaultBaseURL(t *testing.T) {
 func TestNewClient_trimsTrailingSlash(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/evaluate/" {
+		if r.URL.Path != "/v1/evaluate" {
 			t.Errorf("path %q has duplicated slashes", r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")

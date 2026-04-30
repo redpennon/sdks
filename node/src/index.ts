@@ -58,11 +58,11 @@ export class RedPennonClient {
   }
 
   async evaluate(input: EvaluateRequest): Promise<EvaluateResponse> {
-    return this.postJson("/v1/evaluate/", input);
+    return this.postJson("/v1/evaluate", input);
   }
 
   async evaluateBatch(input: BatchRequest): Promise<BatchResponse> {
-    return this.postJson("/v1/evaluate/batch/", input);
+    return this.postJson("/v1/evaluate/batch", input);
   }
 
   private async postJson<T>(path: string, body: unknown): Promise<T> {

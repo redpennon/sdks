@@ -127,7 +127,7 @@ class Client:
                 u = dict(user)
             if u:
                 body["user"] = u
-        data = self._post("/v1/evaluate/", body)
+        data = self._post("/v1/evaluate", body)
         return EvaluateResponse.from_dict(data)
 
     def evaluate_batch(
@@ -144,5 +144,5 @@ class Client:
                 u = dict(user)
             if u:
                 body["user"] = u
-        data = self._post("/v1/evaluate/batch/", body)
+        data = self._post("/v1/evaluate/batch", body)
         return BatchResponse.from_dict(data)

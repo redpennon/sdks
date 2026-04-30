@@ -14,7 +14,7 @@ describe("RedPennonClient", () => {
     const fetchImpl: typeof fetch = async (input, init) => {
       calls.push(init ?? {});
       expect(String(input)).toBe(
-        `${DEFAULT_API_BASE_URL}/v1/evaluate/`,
+        `${DEFAULT_API_BASE_URL}/v1/evaluate`,
       );
       const headers = new Headers(init?.headers);
       expect(headers.get("X-Api-Key")).toBe("test-key");
@@ -39,7 +39,7 @@ describe("RedPennonClient", () => {
   it("evaluateBatch hits batch path", async () => {
     const fetchImpl: typeof fetch = async (input) => {
       expect(String(input)).toBe(
-        `${DEFAULT_API_BASE_URL}/v1/evaluate/batch/`,
+        `${DEFAULT_API_BASE_URL}/v1/evaluate/batch`,
       );
       return jsonResponse(200, {
         results: {

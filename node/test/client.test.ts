@@ -36,6 +36,25 @@ describe("RedPennonClient", () => {
     expect(calls.length).toBe(1);
   });
 
+  it("evaluate surfaces null variation when targeting is disabled", async () => {
+    // When an environment has targeting toggled off, the API returns
+    // `"variation": null` and an empty `variables` map. The SDK
+    // consumer is then expected to fall back to whatever default
+    // value they hard-coded for the variable in their app.
+    const fetchImpl: typeof fetch = async () =>
+      jsonResponse(200, {
+        feature: "my-flag",
+        variation: null,
+        variables: {},
+        reason: "targeting_disabled",
+      });
+    const c = new RedPennonClient({ apiKey: "k", fetchImpl });
+    const res = await c.evaluate({ feature: "my-flag" });
+    expect(res.variation).toBeNull();
+    expect(res.variables).toEqual({});
+    expect(res.reason).toBe("targeting_disabled");
+  });
+
   it("evaluateBatch hits batch path", async () => {
     const fetchImpl: typeof fetch = async (input) => {
       expect(String(input)).toBe(

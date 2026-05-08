@@ -37,15 +37,20 @@ class UserContext:
 @dataclass(frozen=True, slots=True)
 class EvaluateResponse:
     feature: str
-    variation: str
+    # ``None`` when the platform did not serve a value for this
+    # environment (e.g. targeting toggled off, ``reason ==
+    # "targeting_disabled"``). Callers should fall back to whatever
+    # default value they hard-coded for the variable.
+    variation: str | None
     variables: Mapping[str, Any]
     reason: str
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> EvaluateResponse:
+        raw_variation = data.get("variation")
         return cls(
             feature=str(data["feature"]),
-            variation=str(data["variation"]),
+            variation=None if raw_variation is None else str(raw_variation),
             variables=data.get("variables") or {},
             reason=str(data["reason"]),
         )

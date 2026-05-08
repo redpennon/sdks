@@ -39,6 +39,33 @@ def test_evaluate_success() -> None:
     assert res.variables["show_banner"] is True
 
 
+def test_evaluate_targeting_disabled_yields_null_variation() -> None:
+    """When targeting is toggled off the API returns ``"variation":
+    null`` so the caller falls back to whatever default they hard-coded
+    for the variable. The SDK must surface that as
+    ``EvaluateResponse.variation is None`` rather than coercing it to
+    the string "None"."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "feature": "my-flag",
+                "variation": None,
+                "variables": {},
+                "reason": "targeting_disabled",
+            },
+        )
+
+    transport = httpx.MockTransport(handler)
+    with httpx.Client(transport=transport) as http:
+        c = Client(api_key="k", client=http)
+        res = c.evaluate(feature="my-flag")
+    assert res.variation is None
+    assert dict(res.variables) == {}
+    assert res.reason == "targeting_disabled"
+
+
 def test_evaluate_with_user_context() -> None:
     captured: dict = {}
 

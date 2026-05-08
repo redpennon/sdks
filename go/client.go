@@ -29,11 +29,17 @@ type EvaluateRequest struct {
 }
 
 // EvaluateResponse is a successful 200 from POST /v1/evaluate.
+//
+// Variation is a pointer because the API returns ``null`` whenever the
+// platform did not serve a value for this environment — for example when
+// targeting is toggled off (``reason == "targeting_disabled"``). When
+// Variation is nil the SDK consumer should fall back to whatever
+// default value they hard-coded for the variable in their app.
 type EvaluateResponse struct {
-	Feature    string         `json:"feature"`
-	Variation  string         `json:"variation"`
-	Variables  map[string]any `json:"variables"`
-	Reason     string         `json:"reason"`
+	Feature   string         `json:"feature"`
+	Variation *string        `json:"variation"`
+	Variables map[string]any `json:"variables"`
+	Reason    string         `json:"reason"`
 }
 
 // BatchRequest is the body for POST /v1/evaluate/batch.

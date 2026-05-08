@@ -15,7 +15,13 @@ export type EvaluateRequest = {
 
 export type EvaluateResponse = {
   feature: string;
-  variation: string;
+  /**
+   * The slug of the served variation, or `null` when the platform did
+   * not serve a value for this environment (e.g. targeting is toggled
+   * off, returning `reason: "targeting_disabled"`). When `null`, fall
+   * back to whatever default value you hard-coded for the variable.
+   */
+  variation: string | null;
   variables: Record<string, unknown>;
   reason: string;
 };

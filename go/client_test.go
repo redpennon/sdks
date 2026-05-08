@@ -36,11 +36,39 @@ func TestClient_Evaluate_success(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.Feature != "my-flag" || res.Variation != "on" || res.Reason != "targeting_rule_matched" {
+	if res.Feature != "my-flag" || res.Variation == nil || *res.Variation != "on" || res.Reason != "targeting_rule_matched" {
 		t.Fatalf("response: %+v", res)
 	}
 	if v, ok := res.Variables["show_banner"].(bool); !ok || !v {
 		t.Fatalf("variables: %#v", res.Variables)
+	}
+}
+
+func TestClient_Evaluate_nullVariationForTargetingDisabled(t *testing.T) {
+	// When targeting is toggled off the API returns ``"variation":
+	// null`` and an empty ``variables`` map so the SDK consumer falls
+	// back to the code default. Variation must decode to a nil pointer
+	// (not the literal string "null" or the empty string).
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"feature":"my-flag","variation":null,"variables":{},"reason":"targeting_disabled"}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	c := newClient(srv.URL, "test-key")
+	res, err := c.Evaluate(context.Background(), EvaluateRequest{Feature: "my-flag"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Variation != nil {
+		t.Fatalf("expected nil variation, got %v", *res.Variation)
+	}
+	if len(res.Variables) != 0 {
+		t.Fatalf("expected empty variables, got %#v", res.Variables)
+	}
+	if res.Reason != "targeting_disabled" {
+		t.Fatalf("unexpected reason: %s", res.Reason)
 	}
 }
 

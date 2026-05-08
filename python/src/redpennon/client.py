@@ -11,13 +11,31 @@ DEFAULT_API_BASE_URL = "https://api.redpennon.dev"
 
 @dataclass(frozen=True, slots=True)
 class UserContext:
-    """Maps to the evaluation API ``user`` object."""
+    """Maps to the evaluation API ``user`` object.
+
+    ``app_version``, ``platform``, and ``country`` are built-ins that
+    most flag platforms auto-populate from a client-side SDK runtime.
+    Server-side SDKs can't reliably detect any of them — populate them
+    manually from your request context (e.g. parsed from a User-Agent
+    header or a CDN-supplied geo header) if you want to target on
+    them.
+
+    ``custom_data`` carries arbitrary attributes for targeting
+    conditions of type ``custom_property``; keys are looked up by the
+    rule's ``custom_key`` and values may be scalars or list-of-strings.
+    On the wire it serialises as ``customData`` to match the API
+    contract.
+    """
 
     id: str | None = None
     email: str | None = None
     organisation_id: str | None = None
     ip: str | None = None
     audiences: Sequence[str] | None = None
+    app_version: str | None = None
+    platform: str | None = None
+    country: str | None = None
+    custom_data: Mapping[str, Any] | None = None
 
     def to_payload(self) -> dict[str, Any]:
         out: dict[str, Any] = {}
@@ -31,6 +49,14 @@ class UserContext:
             out["ip"] = self.ip
         if self.audiences is not None:
             out["audiences"] = list(self.audiences)
+        if self.app_version is not None:
+            out["app_version"] = self.app_version
+        if self.platform is not None:
+            out["platform"] = self.platform
+        if self.country is not None:
+            out["country"] = self.country
+        if self.custom_data is not None:
+            out["customData"] = dict(self.custom_data)
         return out
 
 

@@ -189,3 +189,74 @@ func TestClient_Evaluate_networkError(t *testing.T) {
 		t.Fatal("expected network error")
 	}
 }
+
+func TestUserContext_serialisesNewBuiltinAndCustomFields(t *testing.T) {
+	t.Parallel()
+	var captured map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &captured)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"feature":"f","variation":"on","variables":{},"reason":"targeting_rule_matched"}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	c := newClient(srv.URL, "k")
+	_, err := c.Evaluate(context.Background(), EvaluateRequest{
+		Feature: "f",
+		User: &UserContext{
+			ID:         "u1",
+			AppVersion: "4.12.0",
+			Platform:   "ios",
+			Country:    "AU",
+			CustomData: map[string]any{
+				"plan":       "enterprise",
+				"trial_days": float64(7),
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	user, _ := captured["user"].(map[string]any)
+	if user["app_version"] != "4.12.0" {
+		t.Errorf("app_version: %v", user["app_version"])
+	}
+	if user["platform"] != "ios" {
+		t.Errorf("platform: %v", user["platform"])
+	}
+	if user["country"] != "AU" {
+		t.Errorf("country: %v", user["country"])
+	}
+	custom, _ := user["customData"].(map[string]any)
+	if custom["plan"] != "enterprise" {
+		t.Errorf("customData.plan: %v", custom["plan"])
+	}
+}
+
+func TestUserContext_omitsUnsetOptionalFields(t *testing.T) {
+	t.Parallel()
+	var captured map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &captured)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"feature":"f","variation":"off","variables":{},"reason":"x"}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	c := newClient(srv.URL, "k")
+	_, err := c.Evaluate(context.Background(), EvaluateRequest{
+		Feature: "f",
+		User:    &UserContext{ID: "u1"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	user, _ := captured["user"].(map[string]any)
+	for _, key := range []string{"app_version", "platform", "country", "customData"} {
+		if _, ok := user[key]; ok {
+			t.Errorf("expected %q to be omitted, got %v", key, user[key])
+		}
+	}
+}

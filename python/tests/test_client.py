@@ -66,6 +66,66 @@ def test_evaluate_targeting_disabled_yields_null_variation() -> None:
     assert res.reason == "targeting_disabled"
 
 
+def test_user_context_serialises_new_builtin_and_custom_fields() -> None:
+    """``app_version``, ``platform``, ``country``, and ``custom_data``
+    map to their wire-side counterparts (``customData`` rather than
+    ``custom_data``) and only serialise when explicitly set."""
+
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["json"] = _request_json(request)
+        return httpx.Response(
+            200,
+            json={
+                "feature": "f",
+                "variation": "on",
+                "variables": {},
+                "reason": "targeting_rule_matched",
+            },
+        )
+
+    transport = httpx.MockTransport(handler)
+    with httpx.Client(transport=transport) as http:
+        c = Client(api_key="k", client=http)
+        u = UserContext(
+            id="u1",
+            app_version="4.12.0",
+            platform="ios",
+            country="AU",
+            custom_data={"plan": "enterprise", "trial_days": 7},
+        )
+        c.evaluate(feature="f", user=u)
+    payload = captured["json"]
+    assert payload["user"]["app_version"] == "4.12.0"
+    assert payload["user"]["platform"] == "ios"
+    assert payload["user"]["country"] == "AU"
+    assert payload["user"]["customData"] == {
+        "plan": "enterprise", "trial_days": 7,
+    }
+
+
+def test_user_context_omits_unset_optional_fields() -> None:
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["json"] = _request_json(request)
+        return httpx.Response(
+            200,
+            json={"feature": "f", "variation": "on", "variables": {}, "reason": "x"},
+        )
+
+    transport = httpx.MockTransport(handler)
+    with httpx.Client(transport=transport) as http:
+        c = Client(api_key="k", client=http)
+        c.evaluate(feature="f", user=UserContext(id="u1"))
+    user = captured["json"]["user"]
+    assert "app_version" not in user
+    assert "platform" not in user
+    assert "country" not in user
+    assert "customData" not in user
+
+
 def test_evaluate_with_user_context() -> None:
     captured: dict = {}
 

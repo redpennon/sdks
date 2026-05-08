@@ -14,12 +14,27 @@ import (
 const DefaultAPIBaseURL = "https://api.redpennon.dev"
 
 // UserContext maps to the evaluation API "user" object.
+//
+// AppVersion, Platform, and Country are built-ins that most flag
+// platforms auto-populate from a client-side SDK runtime. Server-side
+// SDKs can't reliably detect any of them, so populate them manually
+// from your request context (e.g. parsed from a User-Agent header or
+// a CDN-supplied geo header) if you want to target on them.
+//
+// CustomData carries arbitrary attributes for targeting conditions of
+// type ``custom_property``; keys are looked up by the rule's
+// ``custom_key``, values may be strings, numbers, booleans, or
+// []string.
 type UserContext struct {
-	ID               string   `json:"id,omitempty"`
-	Email            string   `json:"email,omitempty"`
-	OrganisationID   string   `json:"organisation_id,omitempty"`
-	IP               string   `json:"ip,omitempty"`
-	Audiences        []string `json:"audiences,omitempty"`
+	ID             string         `json:"id,omitempty"`
+	Email          string         `json:"email,omitempty"`
+	OrganisationID string         `json:"organisation_id,omitempty"`
+	IP             string         `json:"ip,omitempty"`
+	Audiences      []string       `json:"audiences,omitempty"`
+	AppVersion     string         `json:"app_version,omitempty"`
+	Platform       string         `json:"platform,omitempty"`
+	Country        string         `json:"country,omitempty"`
+	CustomData     map[string]any `json:"customData,omitempty"`
 }
 
 // EvaluateRequest is the body for POST /v1/evaluate.

@@ -79,6 +79,35 @@ describe("RedPennonClient", () => {
     expect(batch.results.a.reason).toBe("feature_not_found");
   });
 
+  it("evaluate forwards new built-in and custom_data fields on user", async () => {
+    let capturedBody: Record<string, unknown> | undefined;
+    const fetchImpl: typeof fetch = async (_input, init) => {
+      capturedBody = JSON.parse(String(init?.body));
+      return jsonResponse(200, {
+        feature: "f",
+        variation: "on",
+        variables: {},
+        reason: "targeting_rule_matched",
+      });
+    };
+    const c = new RedPennonClient({ apiKey: "k", fetchImpl });
+    await c.evaluate({
+      feature: "f",
+      user: {
+        id: "u1",
+        app_version: "4.12.0",
+        platform: "ios",
+        country: "AU",
+        customData: { plan: "enterprise", trial_days: 7 },
+      },
+    });
+    const user = (capturedBody as { user: Record<string, unknown> }).user;
+    expect(user.app_version).toBe("4.12.0");
+    expect(user.platform).toBe("ios");
+    expect(user.country).toBe("AU");
+    expect(user.customData).toEqual({ plan: "enterprise", trial_days: 7 });
+  });
+
   it("throws APIError on non-2xx", async () => {
     const fetchImpl: typeof fetch = async () =>
       jsonResponse(401, { error: "Invalid or missing API key." });

@@ -1,6 +1,6 @@
 # RedPennon client SDKs
 
-Thin HTTP clients for the [evaluation API](https://docs.redpennon.dev) (`POST /v1/evaluate`, `POST /v1/evaluate/batch`).
+Thin HTTP clients for the RedPennon flag platform. See the [docs](https://docs.redpennon.dev) for the current API surface.
 
 | SDK    | Directory | Package / module                          |
 | ------ | --------- | ----------------------------------------- |

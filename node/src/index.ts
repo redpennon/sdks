@@ -1,3 +1,26 @@
+/**
+ * RedPennon Node SDK — variable-key evaluation client.
+ *
+ * Two evaluation methods cover the two SDK ergonomics teams reach
+ * for:
+ *
+ *   * {@link RedPennonClient.variableValue} — "give me the value, or
+ *     this fallback". Returns the resolved value or the
+ *     developer-supplied default. Network failures swallow into the
+ *     default so the calling app never crashes because the API is
+ *     unreachable; the developer's code default is the contract.
+ *
+ *   * {@link RedPennonClient.variable} — "give me the full result
+ *     object". Returns the typed result (`value`, `variation`,
+ *     `reason`, `feature`) so callers can branch on `reason` for
+ *     telemetry, dashboards, or per-state UI. Network failures
+ *     surface as {@link APIError}; callers opting into the result
+ *     shape opt into error handling.
+ *
+ * Batch evaluation ({@link RedPennonClient.variables}) lets one HTTP
+ * round-trip resolve many flags for the same user context.
+ */
+
 export const DEFAULT_API_BASE_URL = "https://api.redpennon.dev";
 
 export type UserContext = {
@@ -31,6 +54,34 @@ export type UserContext = {
   customData?: Record<string, unknown>;
 };
 
+/**
+ * Reasons surfaced by the evaluation engine. Mirrors the server-side
+ * constants 1:1 so SDK consumers can switch on the string value.
+ */
+export type EvaluationReason =
+  | "targeting_rule_matched"
+  | "default_variation"
+  | "no_rule_matched"
+  | "targeting_disabled"
+  | "feature_complete"
+  | "feature_deleted"
+  | "feature_archived"
+  | "self_targeting_override"
+  | "variable_not_found";
+
+export type VariableResult<T> = {
+  key: string;
+  /** Resolved value, or `null` when the platform served no value. */
+  value: T | null;
+  /** Variation slug served, or `null` when no value was served. */
+  variation: string | null;
+  reason: EvaluationReason;
+  /** Parent feature slug, or `null` when the key didn't resolve. */
+  feature: string | null;
+};
+
+export type BatchResults = Record<string, VariableResult<unknown>>;
+
 export class APIError extends Error {
   readonly statusCode: number;
   readonly body: string;
@@ -45,17 +96,115 @@ export class APIError extends Error {
 
 export type ClientOptions = {
   apiKey: string;
+  /** Override the API origin. Defaults to {@link DEFAULT_API_BASE_URL}. */
+  baseUrl?: string;
+  /** Override the fetch implementation (handy for tests). */
   fetchImpl?: typeof fetch;
 };
 
+export type EvalOptions = {
+  user?: UserContext;
+};
+
+/**
+ * Thin client around the variable-key evaluation endpoints.
+ * Stateless — one instance can serve any number of concurrent
+ * evaluations and is safe to keep as a module-level singleton.
+ */
 export class RedPennonClient {
   readonly origin: string;
   readonly apiKey: string;
   readonly fetchImpl: typeof fetch;
 
   constructor(options: ClientOptions) {
-    this.origin = DEFAULT_API_BASE_URL.replace(/\/+$/, "");
+    this.origin = (options.baseUrl ?? DEFAULT_API_BASE_URL).replace(/\/+$/, "");
     this.apiKey = options.apiKey;
     this.fetchImpl = options.fetchImpl ?? globalThis.fetch;
+  }
+
+  /**
+   * Resolve a single variable to its full result object.
+   *
+   * Network errors and non-2xx responses surface as {@link APIError};
+   * callers that want fail-open semantics should use
+   * {@link variableValue} instead.
+   */
+  async variable<T = unknown>(
+    key: string,
+    options: EvalOptions = {},
+  ): Promise<VariableResult<T>> {
+    const body: Record<string, unknown> = {};
+    if (options.user) body.user = options.user;
+    const response = await this.fetchImpl(
+      `${this.origin}/v1/variables/${encodeURIComponent(key)}`,
+      {
+        method: "POST",
+        headers: {
+          "X-Api-Key": this.apiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      },
+    );
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new APIError(response.status, response.statusText, text);
+    }
+
+    return (await response.json()) as VariableResult<T>;
+  }
+
+  /**
+   * Resolve a single variable to its value, falling back to
+   * `defaultValue` whenever the platform served no value (network
+   * error, unknown key, deleted/archived feature, targeting
+   * disabled). This is the method that should be reached for in
+   * application code: the developer-supplied default is the
+   * load-bearing contract.
+   */
+  async variableValue<T>(
+    key: string,
+    defaultValue: T,
+    options: EvalOptions = {},
+  ): Promise<T> {
+    try {
+      const result = await this.variable<T>(key, options);
+      return result.value === null ? defaultValue : result.value;
+    } catch {
+      // Swallow all errors — network, API, JSON parse — and serve the
+      // developer-supplied default. The SDK's job is to keep the
+      // calling app running, not to surface infra problems.
+      return defaultValue;
+    }
+  }
+
+  /**
+   * Resolve multiple variables in one HTTP round-trip. Each result
+   * has the same shape as {@link variable}; unknown keys surface as
+   * `variable_not_found` inline.
+   */
+  async variables(
+    keys: string[],
+    options: EvalOptions = {},
+  ): Promise<BatchResults> {
+    const body: Record<string, unknown> = { keys };
+    if (options.user) body.user = options.user;
+    const response = await this.fetchImpl(`${this.origin}/v1/variables`, {
+      method: "POST",
+      headers: {
+        "X-Api-Key": this.apiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new APIError(response.status, response.statusText, text);
+    }
+
+    const parsed = (await response.json()) as { results: BatchResults };
+    return parsed.results;
   }
 }

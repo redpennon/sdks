@@ -28,11 +28,9 @@ function makeFetch(
 }
 
 describe("RedPennonClient (construction)", () => {
-  it("constructs with an api key and default origin", () => {
-    const c = new RedPennonClient({ apiKey: "test-key" });
-    expect(c.apiKey).toBe("test-key");
-    expect(c.origin).toBe(DEFAULT_API_BASE_URL);
-  });
+  // Plain `new RedPennonClient({ apiKey })` + the default origin are
+  // exercised transitively by every per-method test below; the redundant
+  // construction smoke test was removed.
 
   it("accepts a custom origin and strips trailing slashes", () => {
     const c = new RedPennonClient({

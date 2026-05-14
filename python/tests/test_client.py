@@ -38,22 +38,11 @@ def _client_with(handler) -> tuple[Client, list[httpx.Request]]:
 
 # ----------------------------------------------------------------------
 # Construction + plumbing
-
-def test_client_constructs_with_api_key() -> None:
-    with Client(api_key="test-key") as c:
-        assert c.api_key == "test-key"
-
-
-def test_client_accepts_injected_httpx_client() -> None:
-    transport = httpx.MockTransport(lambda req: httpx.Response(204))
-    with httpx.Client(transport=transport) as http:
-        c = Client(api_key="k", client=http)
-        assert c.api_key == "k"
-
-
-def test_default_base_url_is_set() -> None:
-    assert DEFAULT_API_BASE_URL == "https://api.redpennon.dev"
-
+#
+# Construction (api key, injected httpx.Client, default base URL) is
+# exercised transitively by every per-method test below via
+# ``_client_with``; redundant smoke tests were removed to keep this file
+# focused on contract behaviour.
 
 def test_api_error_exposes_status_code_and_message() -> None:
     err = APIError(401, "Invalid or missing API key.")

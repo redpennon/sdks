@@ -49,7 +49,7 @@ describe("RedPennonClient (construction)", () => {
 });
 
 describe("variable()", () => {
-  it("POSTs to /v1/variables/<key> with X-Api-Key and user context", async () => {
+  it("POSTs to /v1/variables/<key> with X-API-Key and user context", async () => {
     // Server-shape response from the new endpoint.
     const { fetchImpl, calls } = makeFetch({
       body: {
@@ -79,7 +79,7 @@ describe("variable()", () => {
     expect(call.url).toBe(`${DEFAULT_API_BASE_URL}/v1/variables/show-banner`);
     expect(call.init.method).toBe("POST");
     const headers = new Headers(call.init.headers);
-    expect(headers.get("X-Api-Key")).toBe("env-key");
+    expect(headers.get("X-API-Key")).toBe("env-key");
     expect(headers.get("Content-Type")).toBe("application/json");
     expect(JSON.parse(String(call.init.body))).toEqual({
       user: { id: "user-123", email: "alice@example.com" },

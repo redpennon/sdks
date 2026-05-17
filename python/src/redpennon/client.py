@@ -224,7 +224,7 @@ class Client:
         response = self._client.post(
             f"{self._origin}{path}",
             headers={
-                "X-Api-Key": self._api_key,
+                "X-API-Key": self._api_key,
                 "Content-Type": "application/json",
             },
             json=body,

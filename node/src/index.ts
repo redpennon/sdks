@@ -140,7 +140,7 @@ export class RedPennonClient {
       {
         method: "POST",
         headers: {
-          "X-Api-Key": this.apiKey,
+          "X-API-Key": this.apiKey,
           "Content-Type": "application/json",
         },
         body: JSON.stringify(body),
@@ -193,7 +193,7 @@ export class RedPennonClient {
     const response = await this.fetchImpl(`${this.origin}/v1/variables`, {
       method: "POST",
       headers: {
-        "X-Api-Key": this.apiKey,
+        "X-API-Key": this.apiKey,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body),

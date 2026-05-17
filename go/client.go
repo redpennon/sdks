@@ -102,7 +102,7 @@ type Client struct {
 }
 
 // NewClient returns a client that calls [DefaultAPIBaseURL] with the
-// given X-Api-Key.
+// given X-API-Key.
 func NewClient(apiKey string) *Client {
 	return newClient(DefaultAPIBaseURL, apiKey)
 }
@@ -142,7 +142,7 @@ func newClient(baseURL, apiKey string) *Client {
 // BaseURL returns the configured API origin.
 func (c *Client) BaseURL() string { return c.baseURL }
 
-// APIKey returns the configured X-Api-Key value.
+// APIKey returns the configured X-API-Key value.
 func (c *Client) APIKey() string { return c.apiKey }
 
 // Variable resolves a single variable to its full [VariableResult].
@@ -216,7 +216,7 @@ func (c *Client) post(ctx context.Context, path string, body any) ([]byte, error
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("X-Api-Key", c.apiKey)
+	req.Header.Set("X-API-Key", c.apiKey)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)

@@ -109,7 +109,7 @@ class TestVariable:
         req = captured[0]
         assert str(req.url) == f"{DEFAULT_API_BASE_URL}/v1/variables/show-banner"
         assert req.method == "POST"
-        assert req.headers["X-Api-Key"] == "env-key"
+        assert req.headers["X-API-Key"] == "env-key"
         assert req.headers["Content-Type"] == "application/json"
         assert json.loads(req.content) == {"user": {"id": "u"}}
 

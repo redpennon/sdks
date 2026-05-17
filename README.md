@@ -16,7 +16,7 @@ Thin HTTP clients for the RedPennon flag platform. See the [docs](https://docs.r
 
 All SDKs default to production `https://api.redpennon.dev`; pass `baseUrl` (Node), `base_url` (Python), or `WithBaseURL(...)` (Go) to point at a different host (e.g. `http://localhost:8001` for local dev). Pass a custom `httpx.Client` (e.g. with `MockTransport`) in Python tests, `fetchImpl` in Node, or `WithHTTPClient` in Go.
 
-Authentication: `X-Api-Key` with the environment API key (UUID).
+Authentication: `X-API-Key` with the environment API key (UUID).
 
 ## API surface (all SDKs)
 

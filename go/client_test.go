@@ -135,8 +135,8 @@ func TestVariable_postsToVariableKeyEndpoint(t *testing.T) {
 	if !strings.HasSuffix(req.URL.Path, "/v1/variables/show-banner") {
 		t.Fatalf("path: %s", req.URL.Path)
 	}
-	if req.Header.Get("X-Api-Key") != "env-key" {
-		t.Fatalf("X-Api-Key not set")
+	if req.Header.Get("X-API-Key") != "env-key" {
+		t.Fatalf("X-API-Key not set")
 	}
 }
 

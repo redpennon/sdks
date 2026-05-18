@@ -114,6 +114,7 @@ class VariableResult:
     variation: str | None
     reason: EvaluationReason
     feature: str | None
+    evaluation_trace: dict[str, Any] | None = None
 
     @classmethod
     def from_payload(cls, payload: Mapping[str, Any]) -> "VariableResult":
@@ -123,6 +124,7 @@ class VariableResult:
             variation=payload.get("variation"),
             reason=payload.get("reason"),  # type: ignore[arg-type]
             feature=payload.get("feature"),
+            evaluation_trace=payload.get("evaluation_trace"),
         )
 
 

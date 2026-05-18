@@ -137,6 +137,34 @@ describe("variable()", () => {
       statusCode: 401,
     });
   });
+
+  it("populates evaluation_trace when present in the API response", async () => {
+    const trace = { matched_rule: "rule-1", environment: "production" };
+    const { fetchImpl } = makeFetch({
+      body: {
+        key: "show-banner",
+        value: true,
+        variation: "on",
+        reason: "targeting_rule_matched",
+        feature: "marketing-banner",
+        evaluation_trace: trace,
+      },
+    });
+    const c = new RedPennonClient({ apiKey: "k", fetchImpl });
+
+    const result = await c.variable<boolean>("show-banner");
+    expect(result.evaluation_trace).toEqual(trace);
+  });
+
+  it("leaves evaluation_trace undefined when absent from the API response", async () => {
+    const { fetchImpl } = makeFetch({
+      body: { key: "k", value: false, variation: "off", reason: "default_variation", feature: "f" },
+    });
+    const c = new RedPennonClient({ apiKey: "k", fetchImpl });
+
+    const result = await c.variable("k");
+    expect(result.evaluation_trace).toBeUndefined();
+  });
 });
 
 describe("variableValue()", () => {

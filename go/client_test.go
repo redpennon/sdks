@@ -300,3 +300,49 @@ func TestVariables_returnsAPIErrorOn401(t *testing.T) {
 		t.Fatalf("expected APIError, got %T", err)
 	}
 }
+
+// ---------------------------------------------------------------------
+// EvaluationTrace
+
+func TestVariable_populatesEvaluationTrace(t *testing.T) {
+	t.Parallel()
+	c, _ := newTestClient(func(req *http.Request) (*http.Response, error) {
+		return jsonResponse(200, map[string]any{
+			"key": "show-banner", "value": true, "variation": "on",
+			"reason": "targeting_rule_matched", "feature": "marketing",
+			"evaluation_trace": map[string]any{
+				"matched_rule": "rule-1",
+				"environment":  "production",
+			},
+		}), nil
+	})
+
+	result, err := c.Variable(context.Background(), "show-banner", nil)
+	if err != nil {
+		t.Fatalf("Variable: %v", err)
+	}
+	if result.EvaluationTrace["matched_rule"] != "rule-1" {
+		t.Fatalf("EvaluationTrace.matched_rule: %v", result.EvaluationTrace["matched_rule"])
+	}
+	if result.EvaluationTrace["environment"] != "production" {
+		t.Fatalf("EvaluationTrace.environment: %v", result.EvaluationTrace["environment"])
+	}
+}
+
+func TestVariable_evaluationTraceNilWhenAbsent(t *testing.T) {
+	t.Parallel()
+	c, _ := newTestClient(func(req *http.Request) (*http.Response, error) {
+		return jsonResponse(200, map[string]any{
+			"key": "k", "value": false, "variation": "off",
+			"reason": "default_variation", "feature": "f",
+		}), nil
+	})
+
+	result, err := c.Variable(context.Background(), "k", nil)
+	if err != nil {
+		t.Fatalf("Variable: %v", err)
+	}
+	if result.EvaluationTrace != nil {
+		t.Fatalf("expected EvaluationTrace to be nil, got %v", result.EvaluationTrace)
+	}
+}

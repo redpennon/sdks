@@ -177,6 +177,38 @@ class TestVariable:
 
         assert exc.value.status_code == 401
 
+    def test_populates_evaluation_trace_when_present(self) -> None:
+        trace = {"matched_rule": "rule-1", "environment": "production"}
+
+        def handler(req: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json={
+                "key": "show-banner",
+                "value": True,
+                "variation": "on",
+                "reason": "targeting_rule_matched",
+                "feature": "marketing",
+                "evaluation_trace": trace,
+            })
+
+        client, _ = _client_with(handler)
+        with client:
+            result = client.variable("show-banner")
+
+        assert result.evaluation_trace == trace
+
+    def test_evaluation_trace_is_none_when_absent(self) -> None:
+        def handler(req: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json={
+                "key": "k", "value": False, "variation": "off",
+                "reason": "default_variation", "feature": "f",
+            })
+
+        client, _ = _client_with(handler)
+        with client:
+            result = client.variable("k")
+
+        assert result.evaluation_trace is None
+
 
 # ----------------------------------------------------------------------
 # ``variable_value()`` — fail-open fallback to caller's default

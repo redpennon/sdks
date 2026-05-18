@@ -78,6 +78,8 @@ export type VariableResult<T> = {
   reason: EvaluationReason;
   /** Parent feature slug, or `null` when the key didn't resolve. */
   feature: string | null;
+  /** Structured evaluation trace returned by the server on successful evaluations. `null` or absent when not available. */
+  evaluation_trace?: Record<string, unknown> | null;
 };
 
 export type BatchResults = Record<string, VariableResult<unknown>>;

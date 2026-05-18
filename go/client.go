@@ -77,11 +77,12 @@ type UserContext struct {
 // (unknown key, targeting disabled, feature deleted/archived);
 // Variation and Feature are likewise nil in those cases.
 type VariableResult struct {
-	Key       string           `json:"key"`
-	Value     any              `json:"value"`
-	Variation *string          `json:"variation"`
-	Reason    EvaluationReason `json:"reason"`
-	Feature   *string          `json:"feature"`
+	Key             string           `json:"key"`
+	Value           any              `json:"value"`
+	Variation       *string          `json:"variation"`
+	Reason          EvaluationReason `json:"reason"`
+	Feature         *string          `json:"feature"`
+	EvaluationTrace map[string]any   `json:"evaluation_trace,omitempty"`
 }
 
 // APIError is returned for non-2xx responses.

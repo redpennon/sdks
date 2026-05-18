@@ -68,6 +68,32 @@ func TestAPIError_FormatsStatusAndMessage(t *testing.T) {
 	}
 }
 
+// Governance error responses carry {"error", "code"}; callers branch on
+// Code (rate_limit_exceeded, organisation_suspended …) rather than the
+// human-readable Message. The code is parsed once when the SDK builds
+// APIError, so consumers don't need to unmarshal Body themselves.
+func TestAPIError_CarriesGovernanceCodeFromResponseBody(t *testing.T) {
+	t.Parallel()
+	c, _ := newTestClient(func(req *http.Request) (*http.Response, error) {
+		return jsonResponse(429, map[string]string{
+			"error": "Rate limit exceeded.",
+			"code":  "rate_limit_exceeded",
+		}), nil
+	})
+
+	_, err := c.Variable(context.Background(), "any-key", nil)
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) {
+		t.Fatalf("expected APIError, got %T %v", err, err)
+	}
+	if apiErr.StatusCode != 429 {
+		t.Fatalf("StatusCode: got %d want 429", apiErr.StatusCode)
+	}
+	if apiErr.Code != "rate_limit_exceeded" {
+		t.Fatalf("Code: got %q want %q", apiErr.Code, "rate_limit_exceeded")
+	}
+}
+
 // ---------------------------------------------------------------------
 // UserContext serialisation
 

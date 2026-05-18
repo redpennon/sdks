@@ -44,7 +44,27 @@ describe("RedPennonClient (construction)", () => {
     const err = new APIError(401, "Unauthorized", '{"error":"nope"}');
     expect(err.statusCode).toBe(401);
     expect(err.body).toBe('{"error":"nope"}');
+    expect(err.code).toBeNull();
     expect(err.name).toBe("APIError");
+  });
+
+  it("APIError carries governance code parsed from response body", async () => {
+    // Governance error responses carry `{"error", "code"}`; callers
+    // branch on `code` (`rate_limit_exceeded`, `organisation_suspended` …)
+    // rather than scraping `message`. The code is parsed once when the
+    // SDK constructs the APIError, so consumers don't need to JSON.parse
+    // `body` themselves.
+    const fetchImpl: typeof fetch = async () =>
+      new Response(
+        JSON.stringify({ error: "Rate limit exceeded.", code: "rate_limit_exceeded" }),
+        { status: 429, headers: { "content-type": "application/json" } },
+      );
+    const c = new RedPennonClient({ apiKey: "k", fetchImpl });
+
+    await expect(c.variable("any-key")).rejects.toMatchObject({
+      statusCode: 429,
+      code: "rate_limit_exceeded",
+    });
   });
 });
 

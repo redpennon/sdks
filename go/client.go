@@ -85,9 +85,17 @@ type VariableResult struct {
 }
 
 // APIError is returned for non-2xx responses.
+//
+// Code mirrors the platform's governance error vocabulary
+// (rate_limit_exceeded, organisation_suspended,
+// monthly_active_users_exceeded …) when the response body carries a
+// structured {"error", "code"} payload. Empty for transport errors or
+// unstructured responses; callers branching on governance state should
+// match on Code, not Message.
 type APIError struct {
 	StatusCode int
 	Message    string
+	Code       string
 }
 
 func (e *APIError) Error() string {
@@ -229,23 +237,30 @@ func (c *Client) post(ctx context.Context, path string, body any) ([]byte, error
 		return nil, err
 	}
 	if resp.StatusCode/100 != 2 {
+		message, code := errorFieldsFromBody(data, resp.Status)
 		return nil, &APIError{
 			StatusCode: resp.StatusCode,
-			Message:    errorMessageFromBody(data, resp.Status),
+			Message:    message,
+			Code:       code,
 		}
 	}
 	return data, nil
 }
 
-func errorMessageFromBody(body []byte, fallback string) string {
+func errorFieldsFromBody(body []byte, fallback string) (string, string) {
 	if len(body) == 0 {
-		return fallback
+		return fallback, ""
 	}
 	var payload struct {
 		Error string `json:"error"`
+		Code  string `json:"code"`
 	}
-	if err := json.Unmarshal(body, &payload); err == nil && payload.Error != "" {
-		return payload.Error
+	if err := json.Unmarshal(body, &payload); err == nil {
+		message := payload.Error
+		if message == "" {
+			message = fallback
+		}
+		return message, payload.Code
 	}
-	return fallback
+	return fallback, ""
 }

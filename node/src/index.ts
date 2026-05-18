@@ -85,13 +85,34 @@ export type BatchResults = Record<string, VariableResult<unknown>>;
 export class APIError extends Error {
   readonly statusCode: number;
   readonly body: string;
+  /**
+   * Platform governance error code parsed from the response body's
+   * structured `{"error", "code"}` payload (e.g. `rate_limit_exceeded`,
+   * `organisation_suspended`, `monthly_active_users_exceeded`).
+   * `null` for transport errors or unstructured responses. Callers
+   * branching on governance state should match on `code`, not `message`.
+   */
+  readonly code: string | null;
 
-  constructor(statusCode: number, message: string, body: string) {
+  constructor(statusCode: number, message: string, body: string, code: string | null = null) {
     super(`redpennon: api error ${statusCode}: ${message}`);
     this.name = "APIError";
     this.statusCode = statusCode;
     this.body = body;
+    this.code = code;
   }
+}
+
+function parseErrorCode(body: string): string | null {
+  try {
+    const parsed = JSON.parse(body);
+    if (parsed && typeof parsed === "object" && typeof parsed.code === "string" && parsed.code) {
+      return parsed.code;
+    }
+  } catch {
+    // Body is not JSON; leave code unparsed.
+  }
+  return null;
 }
 
 export type ClientOptions = {
@@ -149,7 +170,7 @@ export class RedPennonClient {
 
     if (!response.ok) {
       const text = await response.text();
-      throw new APIError(response.status, response.statusText, text);
+      throw new APIError(response.status, response.statusText, text, parseErrorCode(text));
     }
 
     return (await response.json()) as VariableResult<T>;
@@ -201,7 +222,7 @@ export class RedPennonClient {
 
     if (!response.ok) {
       const text = await response.text();
-      throw new APIError(response.status, response.statusText, text);
+      throw new APIError(response.status, response.statusText, text, parseErrorCode(text));
     }
 
     const parsed = (await response.json()) as { results: BatchResults };

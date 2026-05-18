@@ -80,11 +80,20 @@ class UserContext:
 class APIError(Exception):
     """Raised by ``Client.variable`` / ``Client.variables`` on non-2xx
     responses or transport errors. ``Client.variable_value`` swallows
-    these and substitutes the caller's default."""
+    these and substitutes the caller's default.
 
-    def __init__(self, status_code: int, message: str) -> None:
+    ``code`` mirrors the platform's governance error vocabulary
+    (``rate_limit_exceeded``, ``organisation_suspended``,
+    ``monthly_active_users_exceeded`` …) when the response body carries
+    a structured ``{"error", "code"}`` payload. ``None`` for transport
+    errors or unstructured responses; callers branching on governance
+    state should match on ``code``, not ``message``.
+    """
+
+    def __init__(self, status_code: int, message: str, code: str | None = None) -> None:
         self.status_code = status_code
         self.message = message
+        self.code = code
         super().__init__(f"redpennon: api error {status_code}: {message}")
 
 
@@ -230,18 +239,19 @@ class Client:
             json=body,
         )
         if response.status_code // 100 != 2:
-            raise APIError(
-                response.status_code,
-                self._error_message(response),
-            )
+            message, code = self._error_fields(response)
+            raise APIError(response.status_code, message, code)
         return response
 
     @staticmethod
-    def _error_message(response: httpx.Response) -> str:
+    def _error_fields(response: httpx.Response) -> tuple[str, str | None]:
         try:
             payload = response.json()
         except ValueError:
-            return response.text or response.reason_phrase
-        if isinstance(payload, dict) and "error" in payload:
-            return str(payload["error"])
-        return response.reason_phrase
+            return (response.text or response.reason_phrase, None)
+        if not isinstance(payload, dict):
+            return (response.reason_phrase, None)
+        message = str(payload["error"]) if "error" in payload else response.reason_phrase
+        raw_code = payload.get("code")
+        code = str(raw_code) if isinstance(raw_code, str) and raw_code else None
+        return message, code

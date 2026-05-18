@@ -48,7 +48,29 @@ def test_api_error_exposes_status_code_and_message() -> None:
     err = APIError(401, "Invalid or missing API key.")
     assert err.status_code == 401
     assert err.message == "Invalid or missing API key."
+    assert err.code is None
     assert "401" in str(err)
+
+
+def test_api_error_parses_governance_code_from_response_body() -> None:
+    """Governance error responses carry ``{"error", "code"}``; callers
+    branch on ``code`` (``rate_limit_exceeded``, ``organisation_suspended``
+    …) rather than parsing ``message``. The code propagates through
+    ``Client._post`` whenever the body is structured JSON."""
+    import httpx
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            429,
+            json={"error": "Rate limit exceeded.", "code": "rate_limit_exceeded"},
+        )
+
+    client, _ = _client_with(handler)
+    with client, pytest.raises(APIError) as exc:
+        client.variable("any-key")
+
+    assert exc.value.status_code == 429
+    assert exc.value.code == "rate_limit_exceeded"
 
 
 def test_user_context_omits_unset_optional_fields() -> None:

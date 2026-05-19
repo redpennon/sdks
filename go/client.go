@@ -174,18 +174,17 @@ func (c *Client) Variable(ctx context.Context, key string, user *UserContext) (*
 }
 
 // VariableValue resolves a single variable and returns its value, or
-// defaultValue on any failure (unreachable API, non-2xx, value=null).
-// The value return is always safe to use — even when err != nil the
-// caller's default has been substituted in, so a typical caller may
-// safely write:
+// defaultValue on any failure. The returned error is always nil; the
+// default has been substituted for transport errors, non-2xx responses,
+// governance failures, and value=null evaluations. This matches the
+// Node and Python SDK behaviour (see repos/sdks/README.md).
+//
+// To observe the underlying error, call [Client.Variable] directly.
 //
 //	value, _ := client.VariableValue(ctx, "show-banner", false, user)
 func (c *Client) VariableValue(ctx context.Context, key string, defaultValue any, user *UserContext) (any, error) {
 	result, err := c.Variable(ctx, key, user)
-	if err != nil {
-		return defaultValue, err
-	}
-	if result.Value == nil {
+	if err != nil || result.Value == nil {
 		return defaultValue, nil
 	}
 	return result.Value, nil

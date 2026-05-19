@@ -238,18 +238,33 @@ func TestVariableValue_fallsBackOnNullValue(t *testing.T) {
 	}
 }
 
-func TestVariableValue_returnsDefaultAndErrorOnTransportFailure(t *testing.T) {
+func TestVariableValue_swallowsTransportFailure(t *testing.T) {
 	t.Parallel()
 	wantErr := errors.New("offline")
 	c, _ := newTestClient(func(req *http.Request) (*http.Response, error) {
 		return nil, wantErr
 	})
+	// VariableValue mirrors Node/Python fail-open semantics: the
+	// default is substituted and ``error`` is always nil so callers
+	// can safely write ``value, _ := client.VariableValue(...)``.
 	value, err := c.VariableValue(context.Background(), "k", "fallback", nil)
-	if err == nil {
-		t.Fatal("expected error")
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
 	}
-	// The value return is the caller-supplied default — load-bearing
-	// even when err != nil so the caller can safely ignore the error.
+	if value != "fallback" {
+		t.Fatalf("value: %v", value)
+	}
+}
+
+func TestVariableValue_swallowsNon2xx(t *testing.T) {
+	t.Parallel()
+	c, _ := newTestClient(func(req *http.Request) (*http.Response, error) {
+		return jsonResponse(500, map[string]any{"error": "boom"}), nil
+	})
+	value, err := c.VariableValue(context.Background(), "k", "fallback", nil)
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
 	if value != "fallback" {
 		t.Fatalf("value: %v", value)
 	}

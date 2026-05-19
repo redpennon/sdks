@@ -69,7 +69,7 @@ type UserContext struct {
 	AppVersion     string         `json:"app_version,omitempty"`
 	Platform       string         `json:"platform,omitempty"`
 	Country        string         `json:"country,omitempty"`
-	CustomData     map[string]any `json:"customData,omitempty"`
+	CustomData     map[string]any `json:"custom_data,omitempty"`
 }
 
 // VariableResult is the server's evaluation outcome for a single

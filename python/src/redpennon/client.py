@@ -40,8 +40,7 @@ class UserContext:
     ``custom_data`` carries arbitrary attributes for targeting
     conditions of type ``custom_property``; keys are looked up by the
     rule's ``custom_key`` and values may be scalars or list-of-strings.
-    On the wire it serialises as ``customData`` to match the API
-    contract.
+    On the wire it serialises as ``custom_data``.
     """
 
     id: str | None = None
@@ -73,7 +72,7 @@ class UserContext:
         if self.country is not None:
             out["country"] = self.country
         if self.custom_data is not None:
-            out["customData"] = dict(self.custom_data)
+            out["custom_data"] = dict(self.custom_data)
         return out
 
 

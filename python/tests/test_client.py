@@ -98,7 +98,7 @@ def test_user_context_serialises_builtins_and_custom_data() -> None:
         "app_version": "4.12.0",
         "platform": "ios",
         "country": "AU",
-        "customData": {"plan": "enterprise", "trial_days": 7},
+        "custom_data": {"plan": "enterprise", "trial_days": 7},
     }
 
 

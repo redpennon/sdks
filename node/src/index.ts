@@ -51,7 +51,7 @@ export type UserContext = {
    * conditions. Keys are looked up by the rule's `custom_key`; values
    * may be strings, numbers, booleans, or arrays of strings.
    */
-  customData?: Record<string, unknown>;
+  custom_data?: Record<string, unknown>;
 };
 
 /**

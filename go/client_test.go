@@ -102,7 +102,7 @@ func TestUserContext_omitsUnsetOptionalFields(t *testing.T) {
 	payload, _ := json.Marshal(UserContext{ID: "u1"})
 	var got map[string]any
 	_ = json.Unmarshal(payload, &got)
-	for _, key := range []string{"email", "organisation_id", "ip", "audiences", "app_version", "platform", "country", "customData"} {
+	for _, key := range []string{"email", "organisation_id", "ip", "audiences", "app_version", "platform", "country", "custom_data"} {
 		if _, ok := got[key]; ok {
 			t.Errorf("expected %q to be omitted, got %v", key, got[key])
 		}
@@ -120,9 +120,9 @@ func TestUserContext_serialisesBuiltinsAndCustomData(t *testing.T) {
 	if got["app_version"] != "4.12.0" || got["platform"] != "ios" || got["country"] != "AU" {
 		t.Fatalf("unexpected: %v", got)
 	}
-	custom, _ := got["customData"].(map[string]any)
+	custom, _ := got["custom_data"].(map[string]any)
 	if custom["plan"] != "enterprise" {
-		t.Fatalf("customData: %v", custom)
+		t.Fatalf("custom_data: %v", custom)
 	}
 }
 

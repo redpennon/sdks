@@ -15,7 +15,7 @@ import httpx
 import pytest
 
 from redpennon import APIError, Client, DEFAULT_API_BASE_URL, UserContext
-from redpennon.client import VariableResult
+from redpennon.client import EventPayload, TrackEventsResult, VariableResult
 
 
 def _mock_transport(handler):
@@ -178,7 +178,8 @@ class TestVariable:
         assert exc.value.status_code == 401
 
     def test_populates_evaluation_trace_when_present(self) -> None:
-        trace = {"matched_rule": "rule-1", "environment": "production"}
+        """evaluation_trace is an opaque signed string, not a dict."""
+        trace = "rpe_v1:sometoken"
 
         def handler(req: httpx.Request) -> httpx.Response:
             return httpx.Response(200, json={
@@ -194,7 +195,8 @@ class TestVariable:
         with client:
             result = client.variable("show-banner")
 
-        assert result.evaluation_trace == trace
+        assert isinstance(result.evaluation_trace, str)
+        assert result.evaluation_trace == "rpe_v1:sometoken"
 
     def test_evaluation_trace_is_none_when_absent(self) -> None:
         def handler(req: httpx.Request) -> httpx.Response:
@@ -316,3 +318,125 @@ class TestVariablesBatch:
             client.variables(["x"])
 
         assert exc.value.status_code == 401
+
+
+# ----------------------------------------------------------------------
+# ``track_events()`` — POST /v1/events
+
+class TestTrackEvents:
+    def test_returns_accepted_count(self) -> None:
+        def handler(req: httpx.Request) -> httpx.Response:
+            return httpx.Response(202, json={"accepted": 2})
+
+        client, captured = _client_with(handler)
+        events = [
+            EventPayload(event="button_clicked", variable="checkout-flow", variation="variant-a"),
+            EventPayload(event="page_viewed", variable="new-nav", variation="on"),
+        ]
+        with client:
+            result = client.track_events(events)
+
+        assert isinstance(result, TrackEventsResult)
+        assert result.accepted == 2
+
+        req = captured[0]
+        assert str(req.url) == f"{DEFAULT_API_BASE_URL}/v1/events"
+        assert req.method == "POST"
+        assert req.headers["X-API-Key"] == "env-key"
+        assert req.headers["Content-Type"] == "application/json"
+        body = json.loads(req.content)
+        assert body == {
+            "events": [
+                {"event": "button_clicked", "variable": "checkout-flow", "variation": "variant-a"},
+                {"event": "page_viewed", "variable": "new-nav", "variation": "on"},
+            ]
+        }
+
+    def test_serialises_all_optional_fields(self) -> None:
+        def handler(req: httpx.Request) -> httpx.Response:
+            return httpx.Response(202, json={"accepted": 1})
+
+        client, captured = _client_with(handler)
+        event = EventPayload(
+            event="purchase",
+            variable="checkout-flow",
+            variation="variant-a",
+            user=UserContext(id="user-123"),
+            value=42.5,
+            occurred_at="2026-05-01T05:06:07Z",
+            evaluation_trace="rpe_v1:abc123",
+        )
+        with client:
+            client.track_events([event])
+
+        body = json.loads(captured[0].content)
+        assert body["events"][0] == {
+            "event": "purchase",
+            "variable": "checkout-flow",
+            "variation": "variant-a",
+            "user": {"id": "user-123"},
+            "value": 42.5,
+            "occurred_at": "2026-05-01T05:06:07Z",
+            "evaluation_trace": "rpe_v1:abc123",
+        }
+
+    def test_omits_none_optional_fields(self) -> None:
+        def handler(req: httpx.Request) -> httpx.Response:
+            return httpx.Response(202, json={"accepted": 1})
+
+        client, captured = _client_with(handler)
+        with client:
+            client.track_events([
+                EventPayload(event="e", variable="v", variation="var")
+            ])
+
+        body = json.loads(captured[0].content)
+        event_body = body["events"][0]
+        assert "user" not in event_body
+        assert "value" not in event_body
+        assert "occurred_at" not in event_body
+        assert "evaluation_trace" not in event_body
+
+    def test_non_202_raises_api_error(self) -> None:
+        def handler(req: httpx.Request) -> httpx.Response:
+            return httpx.Response(401, json={"error": "Invalid or missing API key."})
+
+        client, _ = _client_with(handler)
+        with client, pytest.raises(APIError) as exc:
+            client.track_events([
+                EventPayload(event="e", variable="v", variation="var")
+            ])
+
+        assert exc.value.status_code == 401
+
+    def test_raises_api_error_with_governance_code(self) -> None:
+        def handler(req: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                429,
+                json={"error": "Rate limit exceeded.", "code": "rate_limit_exceeded"},
+            )
+
+        client, _ = _client_with(handler)
+        with client, pytest.raises(APIError) as exc:
+            client.track_events([
+                EventPayload(event="e", variable="v", variation="var")
+            ])
+
+        assert exc.value.status_code == 429
+        assert exc.value.code == "rate_limit_exceeded"
+
+    def test_raises_api_error_on_events_batch_too_large(self) -> None:
+        def handler(req: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                413,
+                json={"error": "Batch too large.", "code": "events_batch_too_large"},
+            )
+
+        client, _ = _client_with(handler)
+        with client, pytest.raises(APIError) as exc:
+            client.track_events([
+                EventPayload(event="e", variable="v", variation="var")
+            ])
+
+        assert exc.value.status_code == 413
+        assert exc.value.code == "events_batch_too_large"

@@ -1,10 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   APIError,
   DEFAULT_API_BASE_URL,
   RedPennonClient,
   VariableResult,
 } from "../src/index.js";
+import type { EventPayload, TrackEventsResult } from "../src/index.js";
 
 /**
  * Build a fake `fetch` that returns the supplied JSON body with the
@@ -139,7 +140,7 @@ describe("variable()", () => {
   });
 
   it("populates evaluation_trace when present in the API response", async () => {
-    const trace = { matched_rule: "rule-1", environment: "production" };
+    const trace = "rpe_v1:sometoken";
     const { fetchImpl } = makeFetch({
       body: {
         key: "show-banner",
@@ -153,7 +154,9 @@ describe("variable()", () => {
     const c = new RedPennonClient({ apiKey: "k", fetchImpl });
 
     const result = await c.variable<boolean>("show-banner");
-    expect(result.evaluation_trace).toEqual(trace);
+    // evaluation_trace is an opaque signed string from the API
+    const _typeCheck: string | null | undefined = result.evaluation_trace;
+    expect(result.evaluation_trace).toBe(trace);
   });
 
   it("leaves evaluation_trace undefined when absent from the API response", async () => {
@@ -261,6 +264,81 @@ describe("variables() (batch)", () => {
 
     await expect(c.variables(["a"])).rejects.toMatchObject({
       statusCode: 401,
+    });
+  });
+});
+
+describe("trackEvents()", () => {
+  it("POSTs to /v1/events with events array and returns accepted count", async () => {
+    const { fetchImpl, calls } = makeFetch({ status: 202, body: { accepted: 2 } });
+    const c = new RedPennonClient({ apiKey: "env-key", fetchImpl });
+
+    const events: EventPayload[] = [
+      { event: "button_clicked", variable: "checkout-flow", variation: "variant-a" },
+      {
+        event: "purchase",
+        variable: "checkout-flow",
+        variation: "variant-a",
+        user: { id: "user-123" },
+        value: 42.5,
+        occurred_at: "2026-05-01T05:06:07Z",
+        evaluation_trace: "rpe_v1:sometoken",
+      },
+    ];
+
+    const result: TrackEventsResult = await c.trackEvents(events);
+
+    expect(result).toEqual({ accepted: 2 });
+    expect(calls).toHaveLength(1);
+    const [call] = calls;
+    expect(call.url).toBe(`${DEFAULT_API_BASE_URL}/v1/events`);
+    expect(call.init.method).toBe("POST");
+    const headers = new Headers(call.init.headers);
+    expect(headers.get("X-API-Key")).toBe("env-key");
+    expect(headers.get("Content-Type")).toBe("application/json");
+    expect(JSON.parse(String(call.init.body))).toEqual({ events });
+  });
+
+  it("accepts an empty array and returns accepted: 0", async () => {
+    const { fetchImpl, calls } = makeFetch({ status: 202, body: { accepted: 0 } });
+    const c = new RedPennonClient({ apiKey: "k", fetchImpl });
+
+    const result = await c.trackEvents([]);
+
+    expect(result.accepted).toBe(0);
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({ events: [] });
+  });
+
+  it("throws APIError with governance code on non-2xx response", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(
+        JSON.stringify({ error: "Batch too large.", code: "events_batch_too_large" }),
+        { status: 413 },
+      );
+    const c = new RedPennonClient({ apiKey: "k", fetchImpl });
+
+    await expect(
+      c.trackEvents([{ event: "e", variable: "v", variation: "r" }]),
+    ).rejects.toMatchObject({
+      name: "APIError",
+      statusCode: 413,
+      code: "events_batch_too_large",
+    });
+  });
+
+  it("throws APIError on rate limit governance error", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(
+        JSON.stringify({ error: "Rate limit exceeded.", code: "rate_limit_exceeded" }),
+        { status: 429 },
+      );
+    const c = new RedPennonClient({ apiKey: "k", fetchImpl });
+
+    await expect(
+      c.trackEvents([{ event: "e", variable: "v", variation: "r" }]),
+    ).rejects.toMatchObject({
+      statusCode: 429,
+      code: "rate_limit_exceeded",
     });
   });
 });

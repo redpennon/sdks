@@ -310,10 +310,7 @@ func TestVariable_populatesEvaluationTrace(t *testing.T) {
 		return jsonResponse(200, map[string]any{
 			"key": "show-banner", "value": true, "variation": "on",
 			"reason": "targeting_rule_matched", "feature": "marketing",
-			"evaluation_trace": map[string]any{
-				"matched_rule": "rule-1",
-				"environment":  "production",
-			},
+			"evaluation_trace": "rpe_v1:sometoken",
 		}), nil
 	})
 
@@ -321,15 +318,12 @@ func TestVariable_populatesEvaluationTrace(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Variable: %v", err)
 	}
-	if result.EvaluationTrace["matched_rule"] != "rule-1" {
-		t.Fatalf("EvaluationTrace.matched_rule: %v", result.EvaluationTrace["matched_rule"])
-	}
-	if result.EvaluationTrace["environment"] != "production" {
-		t.Fatalf("EvaluationTrace.environment: %v", result.EvaluationTrace["environment"])
+	if result.EvaluationTrace != "rpe_v1:sometoken" {
+		t.Fatalf("EvaluationTrace: got %q want %q", result.EvaluationTrace, "rpe_v1:sometoken")
 	}
 }
 
-func TestVariable_evaluationTraceNilWhenAbsent(t *testing.T) {
+func TestVariable_evaluationTraceEmptyWhenAbsent(t *testing.T) {
 	t.Parallel()
 	c, _ := newTestClient(func(req *http.Request) (*http.Response, error) {
 		return jsonResponse(200, map[string]any{
@@ -342,7 +336,152 @@ func TestVariable_evaluationTraceNilWhenAbsent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Variable: %v", err)
 	}
-	if result.EvaluationTrace != nil {
-		t.Fatalf("expected EvaluationTrace to be nil, got %v", result.EvaluationTrace)
+	if result.EvaluationTrace != "" {
+		t.Fatalf("expected EvaluationTrace to be empty, got %q", result.EvaluationTrace)
+	}
+}
+
+// ---------------------------------------------------------------------
+// TrackEvents()
+
+func TestTrackEvents_postsToEventsEndpoint(t *testing.T) {
+	t.Parallel()
+	c, captured := newTestClient(func(req *http.Request) (*http.Response, error) {
+		return jsonResponse(202, map[string]any{"accepted": 1}), nil
+	})
+
+	_, err := c.TrackEvents(context.Background(), []EventPayload{
+		{Event: "button_clicked", Variable: "checkout-flow", Variation: "variant-a"},
+	})
+	if err != nil {
+		t.Fatalf("TrackEvents: %v", err)
+	}
+	if len(*captured) != 1 {
+		t.Fatalf("expected 1 request, got %d", len(*captured))
+	}
+	req := (*captured)[0]
+	if req.Method != http.MethodPost {
+		t.Fatalf("method: %s", req.Method)
+	}
+	if !strings.HasSuffix(req.URL.Path, "/v1/events") {
+		t.Fatalf("path: %q", req.URL.Path)
+	}
+	if req.Header.Get("X-API-Key") != "env-key" {
+		t.Fatalf("X-API-Key not set")
+	}
+}
+
+func TestTrackEvents_returnsAcceptedCount(t *testing.T) {
+	t.Parallel()
+	c, _ := newTestClient(func(req *http.Request) (*http.Response, error) {
+		return jsonResponse(202, map[string]any{"accepted": 3}), nil
+	})
+
+	result, err := c.TrackEvents(context.Background(), []EventPayload{
+		{Event: "e1", Variable: "v", Variation: "on"},
+		{Event: "e2", Variable: "v", Variation: "on"},
+		{Event: "e3", Variable: "v", Variation: "on"},
+	})
+	if err != nil {
+		t.Fatalf("TrackEvents: %v", err)
+	}
+	if result.Accepted != 3 {
+		t.Fatalf("Accepted: got %d want 3", result.Accepted)
+	}
+}
+
+func TestTrackEvents_returnsAPIErrorOnNon202(t *testing.T) {
+	t.Parallel()
+	c, _ := newTestClient(func(req *http.Request) (*http.Response, error) {
+		return jsonResponse(429, map[string]string{
+			"error": "Rate limit exceeded.",
+			"code":  "rate_limit_exceeded",
+		}), nil
+	})
+
+	_, err := c.TrackEvents(context.Background(), []EventPayload{
+		{Event: "e", Variable: "v", Variation: "on"},
+	})
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) {
+		t.Fatalf("expected APIError, got %T %v", err, err)
+	}
+	if apiErr.StatusCode != 429 {
+		t.Fatalf("StatusCode: got %d want 429", apiErr.StatusCode)
+	}
+	if apiErr.Code != "rate_limit_exceeded" {
+		t.Fatalf("Code: got %q want %q", apiErr.Code, "rate_limit_exceeded")
+	}
+}
+
+func TestTrackEvents_marshalsBatchAsEventsArray(t *testing.T) {
+	t.Parallel()
+	var gotBody map[string]any
+	c, _ := newTestClient(func(req *http.Request) (*http.Response, error) {
+		data, _ := io.ReadAll(req.Body)
+		_ = json.Unmarshal(data, &gotBody)
+		return jsonResponse(202, map[string]any{"accepted": 1}), nil
+	})
+
+	val := 42.5
+	_, err := c.TrackEvents(context.Background(), []EventPayload{
+		{
+			Event: "button_clicked", Variable: "checkout-flow", Variation: "variant-a",
+			User: &UserContext{ID: "user-123"}, Value: &val,
+			OccurredAt: "2026-05-01T05:06:07Z", EvaluationTrace: "rpe_v1:abc123",
+		},
+	})
+	if err != nil {
+		t.Fatalf("TrackEvents: %v", err)
+	}
+
+	events, _ := gotBody["events"].([]any)
+	if len(events) != 1 {
+		t.Fatalf("events array length: got %d want 1", len(events))
+	}
+	ev, _ := events[0].(map[string]any)
+	if ev["event"] != "button_clicked" {
+		t.Fatalf("event: %v", ev["event"])
+	}
+	if ev["variable"] != "checkout-flow" {
+		t.Fatalf("variable: %v", ev["variable"])
+	}
+	if ev["variation"] != "variant-a" {
+		t.Fatalf("variation: %v", ev["variation"])
+	}
+	if ev["evaluation_trace"] != "rpe_v1:abc123" {
+		t.Fatalf("evaluation_trace: %v", ev["evaluation_trace"])
+	}
+	if ev["occurred_at"] != "2026-05-01T05:06:07Z" {
+		t.Fatalf("occurred_at: %v", ev["occurred_at"])
+	}
+	user, _ := ev["user"].(map[string]any)
+	if user["id"] != "user-123" {
+		t.Fatalf("user.id: %v", user["id"])
+	}
+}
+
+func TestTrackEvents_omitsOptionalFieldsWhenZero(t *testing.T) {
+	t.Parallel()
+	var gotBody map[string]any
+	c, _ := newTestClient(func(req *http.Request) (*http.Response, error) {
+		data, _ := io.ReadAll(req.Body)
+		_ = json.Unmarshal(data, &gotBody)
+		return jsonResponse(202, map[string]any{"accepted": 1}), nil
+	})
+
+	_, err := c.TrackEvents(context.Background(), []EventPayload{
+		{Event: "e", Variable: "v", Variation: "on"},
+	})
+	if err != nil {
+		t.Fatalf("TrackEvents: %v", err)
+	}
+
+	events, _ := gotBody["events"].([]any)
+	ev, _ := events[0].(map[string]any)
+	for _, field := range []string{"user", "value", "occurred_at", "evaluation_trace"} {
+		if _, ok := ev[field]; ok {
+			t.Errorf("expected %q to be omitted, got %v", field, ev[field])
+		}
 	}
 }

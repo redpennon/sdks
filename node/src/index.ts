@@ -78,11 +78,27 @@ export type VariableResult<T> = {
   reason: EvaluationReason;
   /** Parent feature slug, or `null` when the key didn't resolve. */
   feature: string | null;
-  /** Structured evaluation trace returned by the server on successful evaluations. `null` or absent when not available. */
-  evaluation_trace?: Record<string, unknown> | null;
+  /** Opaque signed trace token returned by the server when the user has stable identity (`id` or `email`). `null` or absent when not available. Pass to `trackEvents` to correlate metric events with evaluations. */
+  evaluation_trace?: string | null;
 };
 
 export type BatchResults = Record<string, VariableResult<unknown>>;
+
+export type EventPayload = {
+  event: string;
+  variable: string;
+  variation: string;
+  user?: UserContext;
+  value?: number;
+  /** ISO-8601 timestamp; defaults to server receive time when omitted. */
+  occurred_at?: string;
+  /** Opaque trace token from a prior {@link VariableResult.evaluation_trace}. */
+  evaluation_trace?: string;
+};
+
+export type TrackEventsResult = {
+  accepted: number;
+};
 
 export class APIError extends Error {
   readonly statusCode: number;
@@ -200,6 +216,32 @@ export class RedPennonClient {
       // calling app running, not to surface infra problems.
       return defaultValue;
     }
+  }
+
+  /**
+   * Record one or more metric events. Pass the `evaluation_trace` from a
+   * prior {@link variable} call to correlate events with the evaluation
+   * that triggered them.
+   *
+   * Throws {@link APIError} on any non-2xx response, including governance
+   * errors (`events_batch_too_large`, `rate_limit_exceeded`, etc.).
+   */
+  async trackEvents(events: EventPayload[]): Promise<TrackEventsResult> {
+    const response = await this.fetchImpl(`${this.origin}/v1/events`, {
+      method: "POST",
+      headers: {
+        "X-API-Key": this.apiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ events }),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new APIError(response.status, response.statusText, text, parseErrorCode(text));
+    }
+
+    return (await response.json()) as TrackEventsResult;
   }
 
   /**

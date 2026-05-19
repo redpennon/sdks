@@ -114,7 +114,7 @@ class VariableResult:
     variation: str | None
     reason: EvaluationReason
     feature: str | None
-    evaluation_trace: dict[str, Any] | None = None
+    evaluation_trace: str | None = None
 
     @classmethod
     def from_payload(cls, payload: Mapping[str, Any]) -> "VariableResult":
@@ -126,6 +126,22 @@ class VariableResult:
             feature=payload.get("feature"),
             evaluation_trace=payload.get("evaluation_trace"),
         )
+
+
+@dataclass
+class EventPayload:
+    event: str
+    variable: str
+    variation: str
+    user: UserContext | None = None
+    value: float | None = None
+    occurred_at: str | None = None
+    evaluation_trace: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class TrackEventsResult:
+    accepted: int
 
 
 class Client:
@@ -227,6 +243,30 @@ class Client:
         response = self._post("/v1/variables", body)
         results = response.json().get("results", {})
         return {k: VariableResult.from_payload(v) for k, v in results.items()}
+
+    def track_events(self, events: list[EventPayload]) -> TrackEventsResult:
+        """Record a batch of events against variable evaluations.
+
+        Raises :class:`APIError` on any non-202 response.
+        """
+        serialised = []
+        for ev in events:
+            item: dict[str, Any] = {
+                "event": ev.event,
+                "variable": ev.variable,
+                "variation": ev.variation,
+            }
+            if ev.user is not None:
+                item["user"] = ev.user.to_payload()
+            if ev.value is not None:
+                item["value"] = ev.value
+            if ev.occurred_at is not None:
+                item["occurred_at"] = ev.occurred_at
+            if ev.evaluation_trace is not None:
+                item["evaluation_trace"] = ev.evaluation_trace
+            serialised.append(item)
+        response = self._post("/v1/events", {"events": serialised})
+        return TrackEventsResult(accepted=response.json()["accepted"])
 
     # ------------------------------------------------------------------
     # Internal HTTP

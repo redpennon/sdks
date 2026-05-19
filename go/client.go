@@ -82,7 +82,7 @@ type VariableResult struct {
 	Variation       *string          `json:"variation"`
 	Reason          EvaluationReason `json:"reason"`
 	Feature         *string          `json:"feature"`
-	EvaluationTrace map[string]any   `json:"evaluation_trace,omitempty"`
+	EvaluationTrace string           `json:"evaluation_trace,omitempty"`
 }
 
 // APIError is returned for non-2xx responses.
@@ -189,6 +189,40 @@ func (c *Client) VariableValue(ctx context.Context, key string, defaultValue any
 		return defaultValue, nil
 	}
 	return result.Value, nil
+}
+
+// EventPayload describes a single analytics event sent to [Client.TrackEvents].
+//
+// Event, Variable, and Variation are required. User, Value, OccurredAt, and
+// EvaluationTrace are optional; set EvaluationTrace from [VariableResult.EvaluationTrace]
+// to correlate an event with the evaluation that produced the served variation.
+type EventPayload struct {
+	Event           string       `json:"event"`
+	Variable        string       `json:"variable"`
+	Variation       string       `json:"variation"`
+	User            *UserContext `json:"user,omitempty"`
+	Value           *float64     `json:"value,omitempty"`
+	OccurredAt      string       `json:"occurred_at,omitempty"`
+	EvaluationTrace string       `json:"evaluation_trace,omitempty"`
+}
+
+// TrackEventsResult is the server's acknowledgement of a [Client.TrackEvents] call.
+type TrackEventsResult struct {
+	Accepted int `json:"accepted"`
+}
+
+// TrackEvents submits a batch of analytics events to the platform.
+// Returns a [*APIError] on any non-202 response.
+func (c *Client) TrackEvents(ctx context.Context, events []EventPayload) (*TrackEventsResult, error) {
+	resp, err := c.post(ctx, "/v1/events", map[string]any{"events": events})
+	if err != nil {
+		return nil, err
+	}
+	var result TrackEventsResult
+	if err := json.Unmarshal(resp, &result); err != nil {
+		return nil, fmt.Errorf("redpennon: decode track events response: %w", err)
+	}
+	return &result, nil
 }
 
 // Variables resolves a batch of variable keys in one HTTP round-trip.

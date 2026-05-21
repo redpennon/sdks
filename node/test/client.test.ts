@@ -224,6 +224,15 @@ describe("variableValue()", () => {
     const value = await c.variableValue("flag", "fallback");
     expect(value).toBe("fallback");
   });
+
+  it("returns the default when the API responds with a non-2xx status", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response('{"error":"Invalid or missing API key."}', { status: 401 });
+    const c = new RedPennonClient({ apiKey: "k", fetchImpl });
+
+    const value = await c.variableValue("flag", false);
+    expect(value).toBe(false);
+  });
 });
 
 describe("variables() (batch)", () => {

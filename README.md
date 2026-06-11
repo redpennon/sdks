@@ -1,11 +1,11 @@
-# RedPennon client SDKs
+# RedPennon Client SDKs
 
 Thin HTTP clients for the RedPennon flag platform. See the [docs](https://docs.redpennon.dev) for the current API surface.
 
-| SDK    | Directory | Package / module                          |
-| ------ | --------- | ----------------------------------------- |
-| Node   | `node/`   | npm: `@redpennon/node-sdk`                |
-| Go     | `go/`     | module: `github.com/redpennon/sdks/go`    |
+| SDK    | Directory | Package / module                             |
+| ------ | --------- | -------------------------------------------- |
+| Node   | `node/`   | npm: `@redpennon/node-sdk`                   |
+| Go     | `go/`     | module: `github.com/redpennon/sdks/go`       |
 | Python | `python/` | PyPI-style package: `redpennon` (src layout) |
 
 ## Local development

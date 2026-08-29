@@ -440,3 +440,22 @@ class TestTrackEvents:
 
         assert exc.value.status_code == 413
         assert exc.value.code == "events_batch_too_large"
+
+
+# Audit findings #6 and #29.
+
+class TestFailOpenBreadth:
+    def test_default_timeout_is_bounded_and_short(self):
+        import redpennon
+
+        assert redpennon.DEFAULT_TIMEOUT_SECONDS == 1.0
+
+    def test_variable_value_absorbs_a_timeout(self):
+        def hang(request):
+            raise httpx.ReadTimeout('too slow', request=request)
+
+        transport = httpx.MockTransport(hang)
+        client = Client(api_key='k', client=httpx.Client(transport=transport))
+        assert client.variable_value('f', default='fallback') == 'fallback'
+
+

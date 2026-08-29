@@ -6,9 +6,11 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 )
 
 // roundTripFunc lets a test inject HTTP behaviour without spinning
@@ -498,5 +500,47 @@ func TestTrackEvents_omitsOptionalFieldsWhenZero(t *testing.T) {
 		if _, ok := ev[field]; ok {
 			t.Errorf("expected %q to be omitted, got %v", field, ev[field])
 		}
+	}
+}
+
+// Audit findings #6 and #29.
+
+func TestDefaultClientHasATimeout(t *testing.T) {
+	c := NewClient("k")
+	if c.httpClient.Timeout == 0 {
+		t.Fatal("default client must bound requests; http.DefaultClient does not")
+	}
+	if c.httpClient == http.DefaultClient {
+		t.Fatal("must not use the process-global http.DefaultClient")
+	}
+}
+
+func TestWithTimeoutOverridesTheDefault(t *testing.T) {
+	c := NewClientWithOptions("k", WithTimeout(5*time.Second))
+	if c.httpClient.Timeout != 5*time.Second {
+		t.Fatalf("got %v, want 5s", c.httpClient.Timeout)
+	}
+}
+
+func TestWithTimeoutDoesNotMutateTheSharedDefault(t *testing.T) {
+	_ = NewClientWithOptions("k", WithTimeout(5*time.Second))
+	if http.DefaultClient.Timeout != 0 {
+		t.Fatal("WithTimeout leaked into http.DefaultClient")
+	}
+}
+
+func TestVariableValueServesDefaultWhenTheAPIHangs(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(200 * time.Millisecond)
+	}))
+	defer srv.Close()
+
+	c := NewClientWithOptions("k", WithBaseURL(srv.URL), WithTimeout(20*time.Millisecond))
+	got, err := c.VariableValue(context.Background(), "flag", "fallback", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "fallback" {
+		t.Fatalf("got %v, want fallback", got)
 	}
 }

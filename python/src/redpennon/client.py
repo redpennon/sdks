@@ -143,6 +143,15 @@ class TrackEventsResult:
     accepted: int
 
 
+#: Default per-request timeout. A flag lookup that has not answered
+#: within a second is not going to be useful to the caller that asked
+#: for it. The Node and Go SDKs use the same bound; the previous 30s
+#: default here was both out of line with them and long enough that a
+#: stalled API stalled the caller.
+DEFAULT_TIMEOUT_SECONDS = 1.0
+
+
+
 class Client:
     """HTTP client for the RedPennon variable-key evaluation API.
 
@@ -169,7 +178,7 @@ class Client:
         *,
         api_key: str,
         base_url: str = DEFAULT_API_BASE_URL,
-        timeout: float = 30.0,
+        timeout: float = DEFAULT_TIMEOUT_SECONDS,
         client: httpx.Client | None = None,
     ) -> None:
         self._api_key = api_key

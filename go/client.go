@@ -27,6 +27,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // DefaultAPIBaseURL is the production API origin (no trailing slash).
@@ -38,15 +39,15 @@ const DefaultAPIBaseURL = "https://api.redpennon.dev"
 type EvaluationReason string
 
 const (
-	ReasonTargetingRuleMatched   EvaluationReason = "targeting_rule_matched"
-	ReasonDefaultVariation       EvaluationReason = "default_variation"
-	ReasonNoRuleMatched          EvaluationReason = "no_rule_matched"
-	ReasonTargetingDisabled      EvaluationReason = "targeting_disabled"
-	ReasonFeatureComplete        EvaluationReason = "feature_complete"
-	ReasonFeatureDeleted         EvaluationReason = "feature_deleted"
-	ReasonFeatureArchived        EvaluationReason = "feature_archived"
-	ReasonSelfTargetingOverride  EvaluationReason = "self_targeting_override"
-	ReasonVariableNotFound       EvaluationReason = "variable_not_found"
+	ReasonTargetingRuleMatched  EvaluationReason = "targeting_rule_matched"
+	ReasonDefaultVariation      EvaluationReason = "default_variation"
+	ReasonNoRuleMatched         EvaluationReason = "no_rule_matched"
+	ReasonTargetingDisabled     EvaluationReason = "targeting_disabled"
+	ReasonFeatureComplete       EvaluationReason = "feature_complete"
+	ReasonFeatureDeleted        EvaluationReason = "feature_deleted"
+	ReasonFeatureArchived       EvaluationReason = "feature_archived"
+	ReasonSelfTargetingOverride EvaluationReason = "self_targeting_override"
+	ReasonVariableNotFound      EvaluationReason = "variable_not_found"
 )
 
 // UserContext is the targeting context the SDK forwards to the server.
@@ -110,6 +111,11 @@ type Client struct {
 	httpClient *http.Client
 }
 
+// DefaultTimeout bounds each request. A flag lookup that has not
+// answered within a second is not going to be useful to the caller that
+// asked for it.
+const DefaultTimeout = time.Second
+
 // NewClient returns a client that calls [DefaultAPIBaseURL] with the
 // given X-API-Key.
 func NewClient(apiKey string) *Client {
@@ -126,9 +132,20 @@ func WithBaseURL(baseURL string) ClientOption {
 }
 
 // WithHTTPClient injects a custom *http.Client (e.g. one with
-// instrumentation, a custom transport, or a constrained timeout).
+// instrumentation or a custom transport). Supplying a client replaces
+// the default timeout too, so set Timeout on it unless the caller
+// bounds requests some other way.
 func WithHTTPClient(h *http.Client) ClientOption {
 	return func(c *Client) { c.httpClient = h }
+}
+
+// WithTimeout bounds each request. Overrides [DefaultTimeout].
+func WithTimeout(d time.Duration) ClientOption {
+	return func(c *Client) {
+		clone := *c.httpClient
+		clone.Timeout = d
+		c.httpClient = &clone
+	}
 }
 
 // NewClientWithOptions is the option-bearing counterpart to NewClient.
@@ -142,9 +159,15 @@ func NewClientWithOptions(apiKey string, opts ...ClientOption) *Client {
 
 func newClient(baseURL, apiKey string) *Client {
 	return &Client{
-		baseURL:    strings.TrimRight(baseURL, "/"),
-		apiKey:     apiKey,
-		httpClient: http.DefaultClient,
+		baseURL: strings.TrimRight(baseURL, "/"),
+		apiKey:  apiKey,
+		// Not http.DefaultClient: it carries no timeout, so a hung API
+		// blocked the calling goroutine indefinitely — the failure the
+		// fail-open design exists to prevent, and one VariableValue
+		// could not absorb because the request never returned. It is
+		// also process-global, so mutating its Timeout would reach
+		// every other caller in the binary.
+		httpClient: &http.Client{Timeout: DefaultTimeout},
 	}
 }
 

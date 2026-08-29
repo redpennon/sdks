@@ -133,12 +133,29 @@ function parseErrorCode(body: string): string | null {
   return null;
 }
 
+/**
+ * Default per-request timeout, in milliseconds.
+ *
+ * A flag lookup that has not answered within a second is not going to
+ * be useful to the render that asked for it. Without a bound, a hung
+ * API hangs the calling application indefinitely — the exact failure
+ * the fail-open design exists to prevent, and one `variableValue`
+ * cannot catch because the request never returns.
+ */
+export const DEFAULT_TIMEOUT_MS = 1000;
+
 export type ClientOptions = {
   apiKey: string;
   /** Override the API origin. Defaults to {@link DEFAULT_API_BASE_URL}. */
   baseUrl?: string;
   /** Override the fetch implementation (handy for tests). */
   fetchImpl?: typeof fetch;
+  /**
+   * Per-request timeout in milliseconds. Defaults to
+   * {@link DEFAULT_TIMEOUT_MS}. Pass 0 to disable the bound entirely —
+   * only sensible when the caller imposes its own.
+   */
+  timeoutMs?: number;
 };
 
 export type EvalOptions = {
@@ -154,11 +171,29 @@ export class RedPennonClient {
   readonly origin: string;
   readonly apiKey: string;
   readonly fetchImpl: typeof fetch;
+  readonly timeoutMs: number;
 
   constructor(options: ClientOptions) {
     this.origin = (options.baseUrl ?? DEFAULT_API_BASE_URL).replace(/\/+$/, "");
     this.apiKey = options.apiKey;
     this.fetchImpl = options.fetchImpl ?? globalThis.fetch;
+    this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  }
+
+  /** Request init shared by every call, including the timeout signal. */
+  private requestInit(body: unknown): RequestInit {
+    const init: RequestInit = {
+      method: "POST",
+      headers: {
+        "X-API-Key": this.apiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    };
+    if (this.timeoutMs > 0) {
+      init.signal = AbortSignal.timeout(this.timeoutMs);
+    }
+    return init;
   }
 
   /**
@@ -176,14 +211,7 @@ export class RedPennonClient {
     if (options.user) body.user = options.user;
     const response = await this.fetchImpl(
       `${this.origin}/v1/variables/${encodeURIComponent(key)}`,
-      {
-        method: "POST",
-        headers: {
-          "X-API-Key": this.apiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-      },
+      this.requestInit(body),
     );
 
     if (!response.ok) {
@@ -227,14 +255,10 @@ export class RedPennonClient {
    * errors (`events_batch_too_large`, `rate_limit_exceeded`, etc.).
    */
   async trackEvents(events: EventPayload[]): Promise<TrackEventsResult> {
-    const response = await this.fetchImpl(`${this.origin}/v1/events`, {
-      method: "POST",
-      headers: {
-        "X-API-Key": this.apiKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ events }),
-    });
+    const response = await this.fetchImpl(
+      `${this.origin}/v1/events`,
+      this.requestInit({ events }),
+    );
 
     if (!response.ok) {
       const text = await response.text();
@@ -255,14 +279,10 @@ export class RedPennonClient {
   ): Promise<BatchResults> {
     const body: Record<string, unknown> = { keys };
     if (options.user) body.user = options.user;
-    const response = await this.fetchImpl(`${this.origin}/v1/variables`, {
-      method: "POST",
-      headers: {
-        "X-API-Key": this.apiKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
+    const response = await this.fetchImpl(
+      `${this.origin}/v1/variables`,
+      this.requestInit(body),
+    );
 
     if (!response.ok) {
       const text = await response.text();
@@ -272,4 +292,5 @@ export class RedPennonClient {
     const parsed = (await response.json()) as { results: BatchResults };
     return parsed.results;
   }
+
 }

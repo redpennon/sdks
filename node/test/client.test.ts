@@ -351,3 +351,61 @@ describe("trackEvents()", () => {
     });
   });
 });
+
+describe("request timeout", () => {
+  it("aborts a request that outlives the timeout", async () => {
+    const hang: typeof fetch = (_url, init) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () =>
+          reject(new DOMException("aborted", "AbortError")),
+        );
+      });
+
+    const client = new RedPennonClient({
+      apiKey: "k",
+      fetchImpl: hang,
+      timeoutMs: 20,
+    });
+
+    await expect(client.variable("flag")).rejects.toThrow();
+  });
+
+  it("serves the default when the API never answers", async () => {
+    const hang: typeof fetch = (_url, init) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () =>
+          reject(new DOMException("aborted", "AbortError")),
+        );
+      });
+
+    const client = new RedPennonClient({
+      apiKey: "k",
+      fetchImpl: hang,
+      timeoutMs: 20,
+    });
+
+    // The whole point: a hung API must not hang the caller.
+    await expect(client.variableValue("flag", "fallback")).resolves.toBe(
+      "fallback",
+    );
+  });
+
+  it("attaches no signal when the timeout is disabled", async () => {
+    let seenSignal: AbortSignal | null | undefined;
+    const capture: typeof fetch = async (_url, init) => {
+      seenSignal = init?.signal;
+      return new Response(JSON.stringify({ key: "f", value: 1 }), {
+        status: 200,
+      });
+    };
+
+    const client = new RedPennonClient({
+      apiKey: "k",
+      fetchImpl: capture,
+      timeoutMs: 0,
+    });
+    await client.variable("f");
+    expect(seenSignal).toBeUndefined();
+  });
+});
+

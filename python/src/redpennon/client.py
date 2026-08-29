@@ -150,6 +150,14 @@ class TrackEventsResult:
 #: stalled API stalled the caller.
 DEFAULT_TIMEOUT_SECONDS = 1.0
 
+#: Errors the value-returning helpers absorb. Deliberately wider than
+#: (APIError, httpx.HTTPError): a malformed or truncated response raises
+#: JSONDecodeError (a ValueError), and an unexpected payload shape raises
+#: KeyError or TypeError from result parsing. Any of those escaping would
+#: break the caller's render — which is precisely what these helpers
+#: exist to prevent, and what the Node SDK already avoided by catching
+#: everything.
+_FAIL_OPEN_ERRORS = (APIError, httpx.HTTPError, ValueError, KeyError, TypeError)
 
 
 class Client:
@@ -233,10 +241,37 @@ class Client:
         any failure (unreachable API, non-2xx, ``value=None``)."""
         try:
             result = self.variable(key, user=user)
-        except (APIError, httpx.HTTPError) as exc:
+        except _FAIL_OPEN_ERRORS as exc:
             _LOG.warning("redpennon: variable_value(%r) failed: %s", key, exc)
             return default
         return default if result.value is None else result.value  # type: ignore[return-value]
+
+    def variables_values(
+        self,
+        defaults: Mapping[str, Any],
+        *,
+        user: UserContext | None = None,
+    ) -> dict[str, Any]:
+        """Batch counterpart of :meth:`variable_value`.
+
+        Resolves every key in *defaults* and returns a value for each,
+        falling back to the supplied default whenever the platform
+        served no value or the call failed outright. Without this only
+        the single-key path actually failed open, so a caller batching
+        for efficiency had to hand-roll the error handling that makes
+        the SDK's central promise true.
+        """
+        out = dict(defaults)
+        try:
+            results = self.variables(out.keys(), user=user)
+        except _FAIL_OPEN_ERRORS as exc:
+            _LOG.warning("redpennon: variables_values failed: %s", exc)
+            return out
+        for key in defaults:
+            result = results.get(key)
+            if result is not None and result.value is not None:
+                out[key] = result.value
+        return out
 
     def variables(
         self,

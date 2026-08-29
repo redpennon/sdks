@@ -293,4 +293,33 @@ export class RedPennonClient {
     return parsed.results;
   }
 
+  /**
+   * Batch counterpart of {@link variableValue}: resolve many keys and
+   * return a value for each, falling back to the matching entry in
+   * `defaults` whenever the platform served no value or the call failed
+   * outright.
+   *
+   * Without this, only the single-key path actually failed open — a
+   * caller batching for efficiency had to hand-roll the try/catch that
+   * makes the SDK's central promise true.
+   */
+  async variableValues<T extends Record<string, unknown>>(
+    defaults: T,
+    options: EvalOptions = {},
+  ): Promise<T> {
+    const keys = Object.keys(defaults);
+    try {
+      const results = await this.variables(keys, options);
+      const out = { ...defaults };
+      for (const key of keys) {
+        const value = results[key]?.value;
+        if (value !== null && value !== undefined) {
+          (out as Record<string, unknown>)[key] = value;
+        }
+      }
+      return out;
+    } catch {
+      return { ...defaults };
+    }
+  }
 }

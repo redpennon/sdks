@@ -544,3 +544,28 @@ func TestVariableValueServesDefaultWhenTheAPIHangs(t *testing.T) {
 		t.Fatalf("got %v, want fallback", got)
 	}
 }
+
+func TestVariablesValuesFillsDefaults(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		io.WriteString(w, `{"results":{"alpha":{"key":"alpha","value":true},"beta":{"key":"beta","value":null}}}`)
+	}))
+	defer srv.Close()
+
+	c := NewClientWithOptions("k", WithBaseURL(srv.URL))
+	got := c.VariablesValues(context.Background(), map[string]any{"alpha": false, "beta": "fallback"}, nil)
+	if got["alpha"] != true {
+		t.Fatalf("alpha: got %v, want true", got["alpha"])
+	}
+	if got["beta"] != "fallback" {
+		t.Fatalf("beta: got %v, want fallback", got["beta"])
+	}
+}
+
+func TestVariablesValuesReturnsDefaultsWhenTheCallFails(t *testing.T) {
+	c := NewClientWithOptions("k", WithBaseURL("http://127.0.0.1:1"))
+	got := c.VariablesValues(context.Background(), map[string]any{"alpha": false}, nil)
+	if got["alpha"] != false {
+		t.Fatalf("got %v, want false", got["alpha"])
+	}
+}

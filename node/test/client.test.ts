@@ -409,3 +409,30 @@ describe("request timeout", () => {
   });
 });
 
+describe("variableValues", () => {
+  it("fills in defaults for keys the platform served no value for", async () => {
+    const stub: typeof fetch = async () =>
+      new Response(
+        JSON.stringify({
+          results: {
+            alpha: { key: "alpha", value: true, variation: "on", reason: "x", feature: "f" },
+            beta: { key: "beta", value: null, variation: null, reason: "targeting_disabled", feature: "f" },
+          },
+        }),
+        { status: 200 },
+      );
+
+    const client = new RedPennonClient({ apiKey: "k", fetchImpl: stub });
+    const values = await client.variableValues({ alpha: false, beta: "fallback" });
+    expect(values).toEqual({ alpha: true, beta: "fallback" });
+  });
+
+  it("returns every default when the call fails outright", async () => {
+    const boom: typeof fetch = async () => {
+      throw new Error("network down");
+    };
+    const client = new RedPennonClient({ apiKey: "k", fetchImpl: boom });
+    const values = await client.variableValues({ alpha: false, beta: 3 });
+    expect(values).toEqual({ alpha: false, beta: 3 });
+  });
+});

@@ -450,6 +450,16 @@ class TestFailOpenBreadth:
 
         assert redpennon.DEFAULT_TIMEOUT_SECONDS == 1.0
 
+    def test_variable_value_absorbs_a_malformed_response(self):
+        """A truncated or non-JSON body raises JSONDecodeError, which is a
+        ValueError — it used to escape variable_value and break the
+        caller's render, while the Node SDK absorbed it."""
+        transport = httpx.MockTransport(
+            lambda request: httpx.Response(200, content=b'{"key": "f", trunc'),
+        )
+        client = Client(api_key='k', client=httpx.Client(transport=transport))
+        assert client.variable_value('f', default='fallback') == 'fallback'
+
     def test_variable_value_absorbs_a_timeout(self):
         def hang(request):
             raise httpx.ReadTimeout('too slow', request=request)
@@ -459,3 +469,27 @@ class TestFailOpenBreadth:
         assert client.variable_value('f', default='fallback') == 'fallback'
 
 
+class TestVariablesValues:
+    def test_fills_defaults_for_keys_with_no_served_value(self):
+        payload = {
+            'results': {
+                'alpha': {'key': 'alpha', 'value': True},
+                'beta': {'key': 'beta', 'value': None},
+            },
+        }
+        transport = httpx.MockTransport(
+            lambda request: httpx.Response(200, json=payload),
+        )
+        client = Client(api_key='k', client=httpx.Client(transport=transport))
+        values = client.variables_values({'alpha': False, 'beta': 'fallback'})
+        assert values == {'alpha': True, 'beta': 'fallback'}
+
+    def test_returns_all_defaults_when_the_call_fails(self):
+        def boom(request):
+            raise httpx.ConnectError('down', request=request)
+
+        transport = httpx.MockTransport(boom)
+        client = Client(api_key='k', client=httpx.Client(transport=transport))
+        assert client.variables_values({'alpha': False, 'beta': 3}) == {
+            'alpha': False, 'beta': 3,
+        }

@@ -272,6 +272,34 @@ func (c *Client) Variables(ctx context.Context, keys []string, user *UserContext
 	return wrapper.Results, nil
 }
 
+// VariablesValues is the batch counterpart of [Client.VariableValue]:
+// resolve every key in defaults and return a value for each, falling
+// back to the supplied default whenever the platform served no value or
+// the call failed outright.
+//
+// Without it only the single-key path actually failed open, so a caller
+// batching for efficiency had to hand-roll the error handling that makes
+// the SDK's central promise true.
+func (c *Client) VariablesValues(ctx context.Context, defaults map[string]any, user *UserContext) map[string]any {
+	out := make(map[string]any, len(defaults))
+	keys := make([]string, 0, len(defaults))
+	for k, v := range defaults {
+		out[k] = v
+		keys = append(keys, k)
+	}
+
+	results, err := c.Variables(ctx, keys, user)
+	if err != nil {
+		return out
+	}
+	for k := range defaults {
+		if r, ok := results[k]; ok && r.Value != nil {
+			out[k] = r.Value
+		}
+	}
+	return out
+}
+
 func (c *Client) post(ctx context.Context, path string, body any) ([]byte, error) {
 	encoded, err := json.Marshal(body)
 	if err != nil {

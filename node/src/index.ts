@@ -94,10 +94,21 @@ export type EventPayload = {
   occurred_at?: string;
   /** Opaque trace token from a prior {@link VariableResult.evaluation_trace}. */
   evaluation_trace?: string;
+  /**
+   * De-duplication key, unique per environment, at most 200 characters.
+   *
+   * Send one and a retry after a timeout is free: the platform skips
+   * keys it has already stored instead of counting the event twice.
+   * Omit it and repeats are stored — which is correct for genuinely
+   * repeated events, since nothing else can tell them apart.
+   */
+  event_id?: string;
 };
 
 export type TrackEventsResult = {
   accepted: number;
+  /** Rows skipped because their `event_id` was already stored. */
+  duplicates?: number;
 };
 
 export class APIError extends Error {

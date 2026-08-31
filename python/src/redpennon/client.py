@@ -136,11 +136,18 @@ class EventPayload:
     value: float | None = None
     occurred_at: str | None = None
     evaluation_trace: str | None = None
+    #: De-duplication key, unique per environment, at most 200 chars.
+    #: Send one and a retry after a timeout is free — the platform skips
+    #: keys it already holds. Omit it and repeats are stored, which is
+    #: correct for genuinely repeated events.
+    event_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class TrackEventsResult:
     accepted: int
+    #: Rows skipped because their ``event_id`` was already stored.
+    duplicates: int = 0
 
 
 #: Default per-request timeout. A flag lookup that has not answered
@@ -307,9 +314,15 @@ class Client:
                 item["occurred_at"] = ev.occurred_at
             if ev.evaluation_trace is not None:
                 item["evaluation_trace"] = ev.evaluation_trace
+            if ev.event_id is not None:
+                item["event_id"] = ev.event_id
             serialised.append(item)
         response = self._post("/v1/events", {"events": serialised})
-        return TrackEventsResult(accepted=response.json()["accepted"])
+        payload = response.json()
+        return TrackEventsResult(
+            accepted=payload["accepted"],
+            duplicates=payload.get("duplicates", 0),
+        )
 
     # ------------------------------------------------------------------
     # Internal HTTP

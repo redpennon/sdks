@@ -226,11 +226,20 @@ type EventPayload struct {
 	Value           *float64     `json:"value,omitempty"`
 	OccurredAt      string       `json:"occurred_at,omitempty"`
 	EvaluationTrace string       `json:"evaluation_trace,omitempty"`
+	// EventID is a de-duplication key, unique per environment, at most
+	// 200 characters. Send one and a retry after a timeout is free: the
+	// platform skips keys it already holds instead of counting the event
+	// twice. Omit it and repeats are stored, which is correct for
+	// genuinely repeated events since nothing else can tell them apart.
+	EventID string `json:"event_id,omitempty"`
 }
 
 // TrackEventsResult is the server's acknowledgement of a [Client.TrackEvents] call.
 type TrackEventsResult struct {
 	Accepted int `json:"accepted"`
+	// Duplicates counts rows skipped because their EventID was already
+	// stored. Absent from the response when nothing was skipped.
+	Duplicates int `json:"duplicates"`
 }
 
 // TrackEvents submits a batch of analytics events to the platform.

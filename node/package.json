@@ -30,7 +30,7 @@
     "prepublishOnly": "npm test && npm run build"
   },
   "devDependencies": {
-    "@types/node": "^22.14.1",
+    "@types/node": "^26.6.5",
     "typescript": "^5.8.3",
     "vitest": "^3.1.2"
   },

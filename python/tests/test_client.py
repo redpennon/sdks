@@ -352,6 +352,39 @@ class TestTrackEvents:
             ]
         }
 
+    def test_sends_event_id_when_set(self) -> None:
+        def handler(req: httpx.Request) -> httpx.Response:
+            return httpx.Response(202, json={"accepted": 1})
+
+        client, captured = _client_with(handler)
+        event = EventPayload(
+            event="purchase",
+            variable="checkout-flow",
+            variation="variant-a",
+            event_id="order-9f31c8",
+        )
+        with client:
+            result = client.track_events([event])
+
+        assert json.loads(captured[0].content)["events"][0]["event_id"] == "order-9f31c8"
+        assert result.duplicates == 0
+
+    def test_reports_duplicates_skipped_by_event_id(self) -> None:
+        def handler(req: httpx.Request) -> httpx.Response:
+            return httpx.Response(202, json={"accepted": 0, "duplicates": 1})
+
+        client, _ = _client_with(handler)
+        event = EventPayload(
+            event="purchase",
+            variable="checkout-flow",
+            variation="variant-a",
+            event_id="order-9f31c8",
+        )
+        with client:
+            result = client.track_events([event])
+
+        assert result == TrackEventsResult(accepted=0, duplicates=1)
+
     def test_serialises_all_optional_fields(self) -> None:
         def handler(req: httpx.Request) -> httpx.Response:
             return httpx.Response(202, json={"accepted": 1})

@@ -11,7 +11,7 @@ Thin HTTP client for the [RedPennon](https://redpennon.dev) feature flag evaluat
 npm install @redpennon/node-sdk
 ```
 
-Requires Node 20+. No runtime dependencies — uses the global `fetch`.
+Requires Node 22+. No runtime dependencies — uses the global `fetch`.
 
 ## Quick start
 

@@ -21,7 +21,7 @@
   "bugs": "https://github.com/redpennon/sdks/issues",
   "keywords": ["feature-flags", "feature-toggles", "redpennon"],
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

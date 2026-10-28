@@ -10,8 +10,8 @@ Thin HTTP clients for the RedPennon flag platform. See the [docs](https://docs.r
 
 ## Local development
 
-- **Node** (requires Node 20+): `cd node && npm ci && npm test`
-- **Go** (requires Go 1.22+): `cd go && go test ./...`
+- **Node** (requires Node 22+): `cd node && npm ci && npm test`
+- **Go** (requires Go 1.26+): `cd go && go test ./...`
 - **Python** (requires Python 3.12+): `cd python && python -m venv .venv && source .venv/bin/activate && pip install -e '.[dev]' && pytest`
 
 All SDKs default to production `https://api.redpennon.dev`; pass `baseUrl` (Node), `base_url` (Python), or `WithBaseURL(...)` (Go) to point at a different host (e.g. `http://localhost:8001` for local dev). Pass a custom `httpx.Client` (e.g. with `MockTransport`) in Python tests, `fetchImpl` in Node, or `WithHTTPClient` in Go.

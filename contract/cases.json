@@ -1,0 +1,182 @@
+{
+  "_comment": "Wire-format contract shared by the Go, Node and Python SDK test suites. Each SDK replays every case against a fake server and asserts the request it sent and what it returned. Field names are the API's snake_case wire names. A change to the wire format is a change here, and fails all three SDKs together.",
+  "track_events": [
+    {
+      "name": "minimal event",
+      "events": [{ "event": "purchase", "variable": "checkout", "variation": "on" }],
+      "response": { "status": 202, "body": { "accepted": 1 } },
+      "expect": {
+        "path": "/v1/events",
+        "request_body": { "events": [{ "event": "purchase", "variable": "checkout", "variation": "on" }] },
+        "result": { "accepted": 1, "duplicates": 0 }
+      }
+    },
+    {
+      "name": "every optional field is sent under its wire name",
+      "events": [
+        {
+          "event": "purchase",
+          "variable": "checkout",
+          "variation": "on",
+          "user": { "id": "u1", "email": "u1@example.com", "custom_data": { "plan": "pro" } },
+          "value": 12.5,
+          "occurred_at": "2026-01-02T03:04:05Z",
+          "evaluation_trace": "trace-token",
+          "event_id": "evt-1"
+        }
+      ],
+      "response": { "status": 202, "body": { "accepted": 1, "duplicates": 0 } },
+      "expect": {
+        "path": "/v1/events",
+        "request_body": {
+          "events": [
+            {
+              "event": "purchase",
+              "variable": "checkout",
+              "variation": "on",
+              "user": { "id": "u1", "email": "u1@example.com", "custom_data": { "plan": "pro" } },
+              "value": 12.5,
+              "occurred_at": "2026-01-02T03:04:05Z",
+              "evaluation_trace": "trace-token",
+              "event_id": "evt-1"
+            }
+          ]
+        },
+        "result": { "accepted": 1, "duplicates": 0 }
+      }
+    },
+    {
+      "name": "duplicates skipped by event_id are reported",
+      "events": [
+        { "event": "purchase", "variable": "checkout", "variation": "on", "event_id": "evt-1" },
+        { "event": "purchase", "variable": "checkout", "variation": "on", "event_id": "evt-1" }
+      ],
+      "response": { "status": 202, "body": { "accepted": 1, "duplicates": 1 } },
+      "expect": {
+        "path": "/v1/events",
+        "request_body": {
+          "events": [
+            { "event": "purchase", "variable": "checkout", "variation": "on", "event_id": "evt-1" },
+            { "event": "purchase", "variable": "checkout", "variation": "on", "event_id": "evt-1" }
+          ]
+        },
+        "result": { "accepted": 1, "duplicates": 1 }
+      }
+    },
+    {
+      "name": "governance error carries status and code",
+      "events": [{ "event": "purchase", "variable": "checkout", "variation": "on" }],
+      "response": { "status": 429, "body": { "error": "Rate limit exceeded.", "code": "rate_limit_exceeded" } },
+      "expect": { "path": "/v1/events", "error": { "status": 429, "code": "rate_limit_exceeded" } }
+    },
+    {
+      "name": "events batch too large",
+      "events": [{ "event": "purchase", "variable": "checkout", "variation": "on" }],
+      "response": { "status": 400, "body": { "error": "Too many events.", "code": "events_batch_too_large" } },
+      "expect": { "path": "/v1/events", "error": { "status": 400, "code": "events_batch_too_large" } }
+    },
+    {
+      "name": "unstructured error has no code",
+      "events": [{ "event": "purchase", "variable": "checkout", "variation": "on" }],
+      "response": { "status": 502, "body": "Bad Gateway" },
+      "expect": { "path": "/v1/events", "error": { "status": 502, "code": null } }
+    }
+  ],
+  "variable": [
+    {
+      "name": "served value with user context",
+      "key": "checkout.new-flow",
+      "user": { "id": "u1", "country": "AU" },
+      "response": {
+        "status": 200,
+        "body": { "key": "checkout.new-flow", "value": true, "variation": "on", "reason": "targeting_rule_matched", "feature": "checkout" }
+      },
+      "expect": {
+        "path": "/v1/variables/checkout.new-flow",
+        "request_body": { "user": { "id": "u1", "country": "AU" } },
+        "result": { "key": "checkout.new-flow", "value": true, "variation": "on", "reason": "targeting_rule_matched", "feature": "checkout" }
+      }
+    },
+    {
+      "name": "no user sends an empty body",
+      "key": "checkout.new-flow",
+      "response": {
+        "status": 200,
+        "body": { "key": "checkout.new-flow", "value": false, "variation": "off", "reason": "default_variation", "feature": "checkout" }
+      },
+      "expect": {
+        "path": "/v1/variables/checkout.new-flow",
+        "request_body": {},
+        "result": { "key": "checkout.new-flow", "value": false, "variation": "off", "reason": "default_variation", "feature": "checkout" }
+      }
+    },
+    {
+      "name": "the key is URL-encoded in the path",
+      "key": "a/b c",
+      "response": {
+        "status": 200,
+        "body": { "key": "a/b c", "value": 1, "variation": "one", "reason": "default_variation", "feature": "f" }
+      },
+      "expect": {
+        "path": "/v1/variables/a%2Fb%20c",
+        "request_body": {},
+        "result": { "key": "a/b c", "value": 1, "variation": "one", "reason": "default_variation", "feature": "f" }
+      }
+    },
+    {
+      "name": "unknown key is a 200 with a null value (fail-open on the server)",
+      "key": "nope",
+      "response": {
+        "status": 200,
+        "body": { "key": "nope", "value": null, "variation": null, "reason": "variable_not_found", "feature": null }
+      },
+      "expect": {
+        "path": "/v1/variables/nope",
+        "request_body": {},
+        "result": { "key": "nope", "value": null, "variation": null, "reason": "variable_not_found", "feature": null }
+      }
+    },
+    {
+      "name": "organisation suspended carries its governance code",
+      "key": "checkout.new-flow",
+      "response": { "status": 403, "body": { "error": "Organisation suspended.", "code": "organisation_suspended" } },
+      "expect": { "path": "/v1/variables/checkout.new-flow", "error": { "status": 403, "code": "organisation_suspended" } }
+    }
+  ],
+  "variable_value_fail_open": [
+    {
+      "name": "a 500 serves the caller's default",
+      "key": "k",
+      "default": "fallback",
+      "response": { "status": 500, "body": { "error": "boom" } },
+      "expect": { "value": "fallback" }
+    },
+    {
+      "name": "a malformed body serves the caller's default",
+      "key": "k",
+      "default": "fallback",
+      "response": { "status": 200, "body": "this is not json" },
+      "expect": { "value": "fallback" }
+    },
+    {
+      "name": "a null value serves the caller's default",
+      "key": "k",
+      "default": "fallback",
+      "response": {
+        "status": 200,
+        "body": { "key": "k", "value": null, "variation": null, "reason": "variable_not_found", "feature": null }
+      },
+      "expect": { "value": "fallback" }
+    },
+    {
+      "name": "a served value wins over the default",
+      "key": "k",
+      "default": "fallback",
+      "response": {
+        "status": 200,
+        "body": { "key": "k", "value": "served", "variation": "v", "reason": "default_variation", "feature": "f" }
+      },
+      "expect": { "value": "served" }
+    }
+  ]
+}

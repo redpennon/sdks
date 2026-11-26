@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  APIError,
-  DEFAULT_API_BASE_URL,
-  RedPennonClient,
-  VariableResult,
-} from "../src/index.js";
-import type { EventPayload, TrackEventsResult } from "../src/index.js";
+import { APIError, DEFAULT_API_BASE_URL, RedPennonClient } from "../src/index.js";
+import type { EventPayload, TrackEventsResult, VariableResult } from "../src/index.js";
 
 /**
  * Build a fake `fetch` that returns the supplied JSON body with the
